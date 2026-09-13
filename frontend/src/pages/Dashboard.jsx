@@ -28,6 +28,18 @@ export default function Dashboard() {
     await installPrompt.userChoice;
     setInstallPrompt(null);
   }
+
+  async function dismissNotification(id) {
+    setNotifications((ns) => ns.filter((n) => n.id !== id)); // se quita de la vista al toque
+    try {
+      await fetch(`${API_URL}/api/notifications/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch {
+      // si falla, se recarga sola la próxima vez que entre a Inicio
+    }
+  }
   const [titheConfirmed, setTitheConfirmed] = useState(null);
 
   useEffect(() => {
@@ -96,9 +108,18 @@ export default function Dashboard() {
         {notifications.length === 0 && <p className="muted">No tienes notificaciones por ahora.</p>}
         <ul className="notif-list">
           {notifications.map((n) => (
-            <li key={n.id} className={n.is_read ? 'read' : 'unread'}>
-              <strong>{n.title}</strong>
-              <p>{n.message}</p>
+            <li key={n.id} className={n.is_read ? 'read' : 'unread'} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+              <div style={{ flex: 1 }}>
+                <strong>{n.title}</strong>
+                <p>{n.message}</p>
+              </div>
+              <button
+                onClick={() => dismissNotification(n.id)}
+                aria-label="Descartar notificación"
+                style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 16, cursor: 'pointer', padding: '2px 6px' }}
+              >
+                ✕
+              </button>
             </li>
           ))}
         </ul>
