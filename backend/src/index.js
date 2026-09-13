@@ -13,6 +13,7 @@ const reportRoutes = require('./routes/reports');
 const scheduleRoutes = require('./routes/schedules');
 const recordRoutes = require('./routes/records');
 const customTemplateRoutes = require('./routes/custom-templates');
+const churchInfoRoutes = require('./routes/church-info');
 
 const app = express();
 
@@ -31,6 +32,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/schedules', scheduleRoutes);
 app.use('/api/records', recordRoutes);
 app.use('/api/custom-templates', customTemplateRoutes);
+app.use('/api/church-info', churchInfoRoutes);
 
 // Sirve el frontend ya compilado (frontend/dist) desde este mismo servidor,
 // para que todo el portal viva en un solo servicio con un solo link.
