@@ -168,8 +168,8 @@ router.patch('/:id/review', requireAuth, requireRole('admin', 'superadmin'), asy
   if (comment) message += ` Comentario: ${comment}`;
 
   await pool.query(
-    `INSERT INTO notifications (user_id, title, message, expires_at) VALUES ($1, $2, $3, NOW() + INTERVAL '1 day')`,
-    [schedule.created_by, title, message]
+    `INSERT INTO notifications (user_id, title, message, expires_at, schedule_id) VALUES ($1, $2, $3, NOW() + INTERVAL '1 day', $4)`,
+    [schedule.created_by, title, message, schedule.id]
   );
 
   // Si se aprobó, avisa también a cada persona asignada — tanto en filas (schedule_rows) como en campos de encabezado (meta).
@@ -190,12 +190,13 @@ router.patch('/:id/review', requireAuth, requireRole('admin', 'superadmin'), asy
           ? new Date(data.fecha).toLocaleDateString('es-NI', { day: 'numeric', month: 'long' })
           : '';
         await pool.query(
-          `INSERT INTO notifications (user_id, title, message, expires_at) VALUES ($1, $2, $3, $4)`,
+          `INSERT INTO notifications (user_id, title, message, expires_at, schedule_id) VALUES ($1, $2, $3, $4, $5)`,
           [
             value,
             'Se te asignó un privilegio',
             `Te toca "${label}"${dateLabel ? ` el ${dateLabel}` : ''} en "${schedule.title}".`,
             data.fecha || null, // se elimina sola en cuanto pasa la fecha del evento/reunión
+            schedule.id, // y también se elimina al toque si el evento se borra por completo
           ]
         );
       }
