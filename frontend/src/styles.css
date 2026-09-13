@@ -204,6 +204,46 @@ button.secondary, .btn-outline {
   border-bottom: 1px solid var(--line);
 }
 
+/* ---- tarjetas desplegables (Documentos, Eventos, Aprobaciones) ---- */
+.doc-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+.doc-card-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+  cursor: pointer;
+  user-select: none;
+}
+.doc-card-head strong { display: block; font-size: 15px; color: var(--moss-dark); }
+.doc-card-head p { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+.doc-icon {
+  font-size: 20px;
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  border-radius: 50%;
+  background: var(--paper);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.doc-chevron {
+  margin-left: auto;
+  color: var(--muted);
+  transition: transform 0.2s ease;
+}
+.doc-card.open .doc-chevron { transform: rotate(180deg); }
+.doc-card-body { display: none; padding: 4px 20px 22px; }
+.doc-card.open .doc-card-body { display: block; }
+.doc-row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+@media (max-width: 720px) { .doc-row3 { grid-template-columns: 1fr; } }
+
 .verse-card {
   background: linear-gradient(135deg, var(--moss), var(--moss-dark));
   color: #f6f4ee;
