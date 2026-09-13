@@ -25,7 +25,7 @@ async function downloadSchedulePdf(id, title, token, API_URL) {
 }
 
 export default function Events() {
-  const { token, API_URL } = useAuth();
+  const { user, token, API_URL } = useAuth();
   const [events, setEvents] = useState([]);
   const [expanded, setExpanded] = useState(null);
   const [detail, setDetail] = useState(null);
@@ -47,6 +47,14 @@ export default function Events() {
     setExpanded(id);
     const res = await fetch(`${API_URL}/api/schedules/${id}`, { headers: { Authorization: `Bearer ${token}` } });
     setDetail(await res.json());
+  }
+
+  async function handleDelete(id) {
+    if (!window.confirm('¿Borrar este evento? Esta acción no se puede deshacer.')) return;
+    await fetch(`${API_URL}/api/schedules/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+    setEvents((evs) => evs.filter((e) => e.id !== id));
+    setExpanded(null);
+    setDetail(null);
   }
 
   if (loading) return <p className="muted center">Cargando…</p>;
@@ -106,13 +114,24 @@ export default function Events() {
               {detail.meta && detail.meta.recursos && <p style={{ marginTop: 10 }}><strong>Recursos:</strong> {detail.meta.recursos}</p>}
               {detail.meta && detail.meta.observaciones && <p><strong>Observaciones:</strong> {detail.meta.observaciones}</p>}
 
-              <button
-                className="btn-outline"
-                style={{ marginTop: 12, fontSize: 12 }}
-                onClick={() => downloadSchedulePdf(ev.id, ev.title, token, API_URL)}
-              >
-                📄 Descargar / Imprimir PDF
-              </button>
+              <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                <button
+                  className="btn-outline"
+                  style={{ fontSize: 12 }}
+                  onClick={() => downloadSchedulePdf(ev.id, ev.title, token, API_URL)}
+                >
+                  📄 Descargar / Imprimir PDF
+                </button>
+                {['admin', 'superadmin'].includes(user.role) && (
+                  <button
+                    className="btn-outline"
+                    style={{ fontSize: 12, color: '#b23b3b', borderColor: '#b23b3b' }}
+                    onClick={() => handleDelete(ev.id)}
+                  >
+                    🗑️ Borrar evento
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>
