@@ -170,14 +170,25 @@ CREATE TABLE IF NOT EXISTS notifications (
   title VARCHAR(150) NOT NULL,
   message TEXT,
   is_read BOOLEAN NOT NULL DEFAULT false,
+  expires_at TIMESTAMP,
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 `;
+
+// Para bases de datos que ya existían antes de agregar "expires_at" (Railway en producción, por ejemplo).
+const ALTER_STATEMENTS = [
+  `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP;`,
+];
 
 async function migrate() {
   try {
     await pool.query(SCHEMA);
     console.log('Tablas creadas correctamente.');
+
+    for (const stmt of ALTER_STATEMENTS) {
+      await pool.query(stmt);
+    }
+    console.log('Columnas nuevas verificadas.');
 
     // Categorías de finanzas por defecto (el admin puede agregar más luego desde el portal).
     const defaultCategories = [
