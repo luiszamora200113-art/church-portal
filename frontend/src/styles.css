@@ -170,6 +170,7 @@ button.secondary, .btn-outline {
   margin-bottom: 14px;
 }
 .reminder-card.today { border-color: var(--gold); background: #fdf9f0; }
+.reminder-card.cancelled { border-color: #e0b8b8; background: #fdf4f4; opacity: 0.85; }
 .reminder-icon {
   font-size: 22px;
   width: 46px;
