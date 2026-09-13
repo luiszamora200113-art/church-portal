@@ -25,4 +25,14 @@ router.patch('/:id/read', requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
+// DELETE /api/notifications/:id -> el usuario descarta manualmente una notificación suya
+router.delete('/:id', requireAuth, async (req, res) => {
+  const { rowCount } = await pool.query(
+    'DELETE FROM notifications WHERE id = $1 AND user_id = $2',
+    [req.params.id, req.user.id]
+  );
+  if (rowCount === 0) return res.status(404).json({ error: 'No encontrada.' });
+  res.json({ ok: true });
+});
+
 module.exports = router;
