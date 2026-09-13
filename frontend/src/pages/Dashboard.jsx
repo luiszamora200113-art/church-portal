@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { verseOfTheDay } from '../data/verses.js';
+import { verseOfTheDay, greetingOfTheDay } from '../data/verses.js';
 
 export default function Dashboard() {
   const { user, token, logout, API_URL } = useAuth();
@@ -64,7 +64,7 @@ export default function Dashboard() {
     <div className="dashboard">
       <header className="dashboard-header">
         <div>
-          <h1>Hola, {user.full_name.split(' ')[0]}</h1>
+          <h1>{greetingOfTheDay()}, {user.full_name.split(' ')[0]}</h1>
           <p className="subtitle">Bienvenido al portal</p>
         </div>
         <button className="secondary" onClick={logout}>Cerrar sesión</button>
