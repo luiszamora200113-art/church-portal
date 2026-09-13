@@ -45,8 +45,12 @@ function RequireAuthOnly({ children }) {
 }
 
 function Nav() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const location = useLocation();
+  const [menuOpen, setMenuOpen] = React.useState(false);
+
+  React.useEffect(() => { setMenuOpen(false); }, [location.pathname]);
+
   if (!user) return null;
   // El nav del miembro no se muestra dentro de los paneles con su propio layout (admin, tesorería, secretaría).
   if (location.pathname.startsWith('/admin')) return null;
@@ -62,7 +66,14 @@ function Nav() {
         <img className="brand-logo" src="/assets/logo-claro.png" alt="Logo Iglesia Hechos 1:8" />
         Hechos 1:8
       </div>
-      <nav>
+      <button
+        className="nav-toggle"
+        aria-label="Abrir menú"
+        onClick={() => setMenuOpen((o) => !o)}
+      >
+        {menuOpen ? '✕' : '☰'}
+      </button>
+      <nav className={menuOpen ? 'open' : ''}>
         <Link className={linkClass('/dashboard')} to="/dashboard">Inicio</Link>
         <Link className={linkClass('/deberes')} to="/deberes">Mis privilegios</Link>
         <Link className={linkClass('/mi-celula')} to="/mi-celula">Mi célula</Link>
@@ -78,6 +89,7 @@ function Nav() {
         {user.role === 'finance' && <Link className={linkClass('/tesoreria')} to="/tesoreria">Tesorería</Link>}
         {user.role === 'secretary' && <Link className={linkClass('/secretaria')} to="/secretaria">Secretaría</Link>}
         {user.role === 'education' && <Link className={linkClass('/educacion')} to="/educacion">Educación Cristiana</Link>}
+        <a href="#" className="nav-logout" onClick={(e) => { e.preventDefault(); logout(); }}>Cerrar sesión</a>
       </nav>
     </div>
   );
