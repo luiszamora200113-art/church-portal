@@ -36,6 +36,9 @@ export default function AdminLayout() {
           {user.role === 'superadmin' && (
             <Link className={linkClass('/admin/plantillas')} to="/admin/plantillas">Plantillas</Link>
           )}
+          {user.role === 'superadmin' && (
+            <Link className={linkClass('/admin/conocenos')} to="/admin/conocenos">Conócenos</Link>
+          )}
           <Link className={linkClass('/admin/finanzas')} to="/admin/finanzas">Finanzas</Link>
           <Link className={linkClass('/admin/documentos')} to="/admin/documentos" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             Aprobaciones
