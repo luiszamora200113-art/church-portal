@@ -3,27 +3,41 @@ import { useAuth } from '../context/AuthContext.jsx';
 
 const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
+function nextOccurrence(dayOfWeek) {
+  const today = new Date();
+  const diff = (dayOfWeek - today.getDay() + 7) % 7;
+  const next = new Date(today);
+  next.setDate(today.getDate() + diff);
+  return next.toISOString().slice(0, 10);
+}
+
 export default function Privileges() {
   const { token, API_URL } = useAuth();
   const [cell, setCell] = useState(null);
   const [titheConfirmed, setTitheConfirmed] = useState(false);
   const [assignments, setAssignments] = useState([]);
+  const [services, setServices] = useState([]);
+  const [cancellations, setCancellations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [salary, setSalary] = useState('');
 
   const todayName = dayNames[new Date().getDay()];
 
   async function loadAll() {
-    const [cellRes, titheRes, assignRes] = await Promise.all([
+    const [cellRes, titheRes, assignRes, servicesRes] = await Promise.all([
       fetch(`${API_URL}/api/cells/mine`, { headers: { Authorization: `Bearer ${token}` } }),
       fetch(`${API_URL}/api/tithe/mine`, { headers: { Authorization: `Bearer ${token}` } }),
       fetch(`${API_URL}/api/schedules/assignments/mine`, { headers: { Authorization: `Bearer ${token}` } }),
+      fetch(`${API_URL}/api/services`, { headers: { Authorization: `Bearer ${token}` } }),
     ]);
     const cellData = await cellRes.json();
     setCell(cellData.cell || null);
     const titheData = await titheRes.json();
     setTitheConfirmed(titheData.confirmed);
     setAssignments(await assignRes.json());
+    const servicesData = await servicesRes.json();
+    setServices(servicesData.services || []);
+    setCancellations(servicesData.cancellations || []);
   }
 
   useEffect(() => {
@@ -98,23 +112,24 @@ export default function Privileges() {
         <span className="reminder-when">Este mes</span>
       </div>
 
-      <div className="reminder-card">
-        <div className="reminder-icon">⛪</div>
-        <div className="reminder-text">
-          <strong>Servicio dominical (mañana)</strong>
-          <p>Cada domingo, 10:00 AM en el templo principal.</p>
-        </div>
-        <span className="reminder-when">Domingo</span>
-      </div>
-
-      <div className="reminder-card">
-        <div className="reminder-icon">⛪</div>
-        <div className="reminder-text">
-          <strong>Servicio dominical (tarde)</strong>
-          <p>Cada domingo, 5:00 PM en el templo principal.</p>
-        </div>
-        <span className="reminder-when">Domingo</span>
-      </div>
+      {services.map((s) => {
+        const occurDate = nextOccurrence(s.day_of_week);
+        const cancellation = cancellations.find((c) => c.service_id === s.id && c.cancel_date === occurDate);
+        return (
+          <div className={`reminder-card ${cancellation ? 'cancelled' : ''}`} key={s.id}>
+            <div className="reminder-icon">{s.icon}</div>
+            <div className="reminder-text">
+              <strong>{s.name}</strong>
+              {cancellation ? (
+                <p><strong style={{ color: '#b23b3b' }}>Cancelado esta semana.</strong> {cancellation.note}</p>
+              ) : (
+                <p>Cada {dayNames[s.day_of_week].toLowerCase()}, {s.time_label}{s.location ? ` en ${s.location}` : ' en el templo principal'}.</p>
+              )}
+            </div>
+            <span className="reminder-when">{dayNames[s.day_of_week]}</span>
+          </div>
+        );
+      })}
 
       <div className="card">
         <h2>Calculadora de diezmo</h2>
