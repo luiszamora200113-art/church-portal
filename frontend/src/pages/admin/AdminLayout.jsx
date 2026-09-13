@@ -33,6 +33,7 @@ export default function AdminLayout() {
         <nav className="admin-nav">
           <Link className={linkClass('/admin/miembros')} to="/admin/miembros">Miembros</Link>
           <Link className={linkClass('/admin/celulas')} to="/admin/celulas">Células</Link>
+          <Link className={linkClass('/admin/servicios')} to="/admin/servicios">Servicios</Link>
           {user.role === 'superadmin' && (
             <Link className={linkClass('/admin/plantillas')} to="/admin/plantillas">Plantillas</Link>
           )}
