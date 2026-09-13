@@ -171,13 +171,15 @@ CREATE TABLE IF NOT EXISTS notifications (
   message TEXT,
   is_read BOOLEAN NOT NULL DEFAULT false,
   expires_at TIMESTAMP,
+  schedule_id INTEGER REFERENCES schedules(id) ON DELETE CASCADE,
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 `;
 
-// Para bases de datos que ya existían antes de agregar "expires_at" (Railway en producción, por ejemplo).
+// Para bases de datos que ya existían antes de agregar estas columnas (Railway en producción, por ejemplo).
 const ALTER_STATEMENTS = [
   `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP;`,
+  `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS schedule_id INTEGER REFERENCES schedules(id) ON DELETE CASCADE;`,
 ];
 
 async function migrate() {
