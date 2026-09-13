@@ -177,26 +177,38 @@ router.get('/diezmos.pdf', requireAuth, requireRole('admin', 'superadmin'), asyn
   finish();
 });
 
-// GET /api/reports/miembros.pdf -> listado de miembros por célula
+// GET /api/reports/miembros.pdf -> listado de miembros agrupado y separado visualmente por célula
 router.get('/miembros.pdf', requireAuth, requireRole('admin', 'superadmin'), async (req, res) => {
-  const { rows } = await pool.query(`
-    SELECT u.full_name, COALESCE(c.name, 'Sin célula asignada') AS cell_name
+  const { rows: cellList } = await pool.query('SELECT id, name FROM cells ORDER BY id');
+  const { rows: members } = await pool.query(`
+    SELECT u.full_name, u.cell_id
     FROM users u
-    LEFT JOIN cells c ON c.id = u.cell_id
     WHERE u.role = 'member'
-    ORDER BY cell_name, u.full_name
+    ORDER BY u.full_name
   `);
 
-  const { doc, finish } = createLetterheadPdf(res, 'reporte-miembros.pdf', 'Miembros por Célula', `${rows.length} miembros registrados`);
+  const totalCount = members.length;
+  const { doc, finish } = createLetterheadPdf(res, 'reporte-miembros.pdf', 'Miembros por Célula', `${totalCount} miembros registrados`);
 
-  drawTable(
-    doc,
-    [
-      { key: 'full_name', label: 'Miembro', width: 340 },
-      { key: 'cell_name', label: 'Célula', width: 172, align: 'right' },
-    ],
-    rows
-  );
+  const groups = [
+    ...cellList.map((c) => ({ label: c.name, members: members.filter((m) => m.cell_id === c.id) })),
+    { label: 'Sin célula asignada', members: members.filter((m) => !m.cell_id) },
+  ].filter((g) => g.members.length > 0);
+
+  groups.forEach((group, i) => {
+    if (doc.y > doc.page.height - 140) doc.addPage();
+    if (i > 0) doc.moveDown(0.8);
+
+    doc.font('Helvetica-Bold').fontSize(12).fillColor(MOSS_DARK).text(`${group.label}  ·  ${group.members.length}`, 50, doc.y);
+    doc.moveTo(50, doc.y + 4).lineTo(300, doc.y + 4).strokeColor(GOLD).lineWidth(1).stroke();
+    doc.moveDown(0.6);
+
+    group.members.forEach((m) => {
+      if (doc.y > doc.page.height - 90) doc.addPage();
+      doc.font('Helvetica').fontSize(10.5).fillColor('#2b2b26').text(`•  ${m.full_name}`, 62, doc.y);
+      doc.moveDown(0.25);
+    });
+  });
 
   finish();
 });
