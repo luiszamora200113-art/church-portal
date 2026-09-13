@@ -24,3 +24,12 @@ export function verseOfTheDay() {
   );
   return VERSES[dayOfYear % VERSES.length];
 }
+
+const GREETINGS = ['Hola', 'Bendiciones', 'Dios te bendiga'];
+
+export function greetingOfTheDay() {
+  const dayOfYear = Math.floor(
+    (Date.now() - new Date(new Date().getFullYear(), 0, 0)) / 86400000
+  );
+  return GREETINGS[dayOfYear % GREETINGS.length];
+}
