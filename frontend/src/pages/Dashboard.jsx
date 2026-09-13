@@ -105,7 +105,7 @@ export default function Dashboard() {
       </section>
 
       <section className="grid">
-        <Link to="/mis-privilegios" className="mini-card" style={{ textDecoration: 'none', color: 'inherit' }}>
+        <Link to="/deberes" className="mini-card" style={{ textDecoration: 'none', color: 'inherit' }}>
           <span className="eyebrow">Mis privilegios</span>
           <h3>Recordatorios y diezmo</h3>
           <p>{titheConfirmed === null ? 'Ver mis privilegios' : titheConfirmed ? 'Diezmo confirmado ✓' : 'Diezmo pendiente este mes'}</p>
@@ -114,6 +114,16 @@ export default function Dashboard() {
           <span className="eyebrow">Comunidad</span>
           <h3>Mi célula</h3>
           <p>Consulta o cambia tu célula.</p>
+        </Link>
+        <Link to="/eventos" className="mini-card" style={{ textDecoration: 'none', color: 'inherit' }}>
+          <span className="eyebrow">Actividades</span>
+          <h3>Eventos</h3>
+          <p>Próximas actividades ya aprobadas.</p>
+        </Link>
+        <Link to="/programacion" className="mini-card" style={{ textDecoration: 'none', color: 'inherit' }}>
+          <span className="eyebrow">Calendario</span>
+          <h3>Programación</h3>
+          <p>Cultos y temas del mes.</p>
         </Link>
         <Link to="/finanzas" className="mini-card" style={{ textDecoration: 'none', color: 'inherit' }}>
           <span className="eyebrow">Transparencia</span>
