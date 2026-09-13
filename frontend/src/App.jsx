@@ -10,6 +10,8 @@ import AdminLayout from './pages/admin/AdminLayout.jsx';
 import CreateMember from './pages/admin/CreateMember.jsx';
 import AdminCells from './pages/admin/AdminCells.jsx';
 import AdminTemplates from './pages/admin/AdminTemplates.jsx';
+import AdminChurchInfo from './pages/admin/AdminChurchInfo.jsx';
+import AboutChurch from './pages/AboutChurch.jsx';
 import AdminFinance from './pages/admin/AdminFinance.jsx';
 import AdminDuties from './pages/admin/AdminDuties.jsx';
 import AdminDocuments from './pages/admin/AdminDocuments.jsx';
@@ -80,6 +82,7 @@ function Nav() {
         <Link className={linkClass('/finanzas')} to="/finanzas">Finanzas</Link>
         <Link className={linkClass('/eventos')} to="/eventos">Eventos</Link>
         <Link className={linkClass('/programacion')} to="/programacion">Programación</Link>
+        <Link className={linkClass('/conocenos')} to="/conocenos">Conócenos</Link>
         {['admin', 'superadmin', 'secretary'].includes(user.role) && (
           <Link className={linkClass('/documentos')} to="/documentos">Documentos</Link>
         )}
@@ -150,6 +153,14 @@ export default function App() {
           }
         />
         <Route
+          path="/conocenos"
+          element={
+            <ProtectedRoute>
+              <AboutChurch />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/eventos"
           element={
             <ProtectedRoute>
@@ -175,6 +186,7 @@ export default function App() {
           <Route path="miembros" element={<CreateMember />} />
           <Route path="celulas" element={<AdminCells />} />
           <Route path="plantillas" element={<AdminTemplates />} />
+          <Route path="conocenos" element={<AdminChurchInfo />} />
           <Route path="finanzas" element={<AdminFinance />} />
           <Route path="deberes" element={<AdminDuties />} />
           <Route path="documentos" element={<AdminDocuments />} />
