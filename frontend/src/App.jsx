@@ -11,6 +11,7 @@ import CreateMember from './pages/admin/CreateMember.jsx';
 import AdminCells from './pages/admin/AdminCells.jsx';
 import AdminTemplates from './pages/admin/AdminTemplates.jsx';
 import AdminChurchInfo from './pages/admin/AdminChurchInfo.jsx';
+import AdminServices from './pages/admin/AdminServices.jsx';
 import AboutChurch from './pages/AboutChurch.jsx';
 import AdminFinance from './pages/admin/AdminFinance.jsx';
 import AdminDuties from './pages/admin/AdminDuties.jsx';
@@ -187,6 +188,7 @@ export default function App() {
           <Route path="celulas" element={<AdminCells />} />
           <Route path="plantillas" element={<AdminTemplates />} />
           <Route path="conocenos" element={<AdminChurchInfo />} />
+          <Route path="servicios" element={<AdminServices />} />
           <Route path="finanzas" element={<AdminFinance />} />
           <Route path="deberes" element={<AdminDuties />} />
           <Route path="documentos" element={<AdminDocuments />} />
