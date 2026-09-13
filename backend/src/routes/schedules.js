@@ -30,6 +30,10 @@ router.get('/', requireAuth, async (req, res) => {
     params.push(cell_id);
     where += ` AND s.cell_id = $${params.length}`;
   }
+  // Un evento ya pasado deja de ser relevante para "Eventos" — desaparece solo el día después de su fecha.
+  if (type === 'evento') {
+    where += ` AND (s.reference_date IS NULL OR s.reference_date >= CURRENT_DATE)`;
+  }
   const { rows } = await pool.query(
     `SELECT s.*, u.full_name AS created_by_name
      FROM schedules s JOIN users u ON u.id = s.created_by
@@ -164,7 +168,7 @@ router.patch('/:id/review', requireAuth, requireRole('admin', 'superadmin'), asy
   if (comment) message += ` Comentario: ${comment}`;
 
   await pool.query(
-    `INSERT INTO notifications (user_id, title, message) VALUES ($1, $2, $3)`,
+    `INSERT INTO notifications (user_id, title, message, expires_at) VALUES ($1, $2, $3, NOW() + INTERVAL '1 day')`,
     [schedule.created_by, title, message]
   );
 
@@ -186,11 +190,12 @@ router.patch('/:id/review', requireAuth, requireRole('admin', 'superadmin'), asy
           ? new Date(data.fecha).toLocaleDateString('es-NI', { day: 'numeric', month: 'long' })
           : '';
         await pool.query(
-          `INSERT INTO notifications (user_id, title, message) VALUES ($1, $2, $3)`,
+          `INSERT INTO notifications (user_id, title, message, expires_at) VALUES ($1, $2, $3, $4)`,
           [
             value,
             'Se te asignó un privilegio',
             `Te toca "${label}"${dateLabel ? ` el ${dateLabel}` : ''} en "${schedule.title}".`,
+            data.fecha || null, // se elimina sola en cuanto pasa la fecha del evento/reunión
           ]
         );
       }
@@ -328,6 +333,13 @@ router.patch('/:id/complete', requireAuth, requireRole('admin', 'superadmin'), a
     await pool.query('UPDATE schedules SET meta = $1 WHERE id = $2', [JSON.stringify(newMeta), req.params.id]);
   }
 
+  res.json({ ok: true });
+});
+
+// DELETE /api/schedules/:id -> el admin borra una programación (evento, célula, etc.) por completo.
+router.delete('/:id', requireAuth, requireRole('admin', 'superadmin'), async (req, res) => {
+  const { rowCount } = await pool.query('DELETE FROM schedules WHERE id = $1', [req.params.id]);
+  if (rowCount === 0) return res.status(404).json({ error: 'No encontrado.' });
   res.json({ ok: true });
 });
 
