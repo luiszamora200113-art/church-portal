@@ -161,6 +161,30 @@ CREATE TABLE IF NOT EXISTS church_leaders (
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+-- Servicios recurrentes que se muestran como recordatorio fijo en "Mis privilegios" (ej. culto dominical, miércoles).
+CREATE TABLE IF NOT EXISTS church_services (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(150) NOT NULL,
+  day_of_week INTEGER NOT NULL, -- 0=domingo ... 6=sábado
+  time_label VARCHAR(50) NOT NULL,
+  location VARCHAR(150),
+  icon VARCHAR(10) NOT NULL DEFAULT '⛪',
+  active BOOLEAN NOT NULL DEFAULT true,
+  order_index INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- Cancelaciones puntuales: "este domingo en particular no hay este servicio", sin desactivarlo para siempre.
+CREATE TABLE IF NOT EXISTS service_cancellations (
+  id SERIAL PRIMARY KEY,
+  service_id INTEGER NOT NULL REFERENCES church_services(id) ON DELETE CASCADE,
+  cancel_date DATE NOT NULL,
+  note VARCHAR(255),
+  created_by INTEGER REFERENCES users(id),
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  UNIQUE(service_id, cancel_date)
+);
+
 CREATE TABLE IF NOT EXISTS document_templates (
   id SERIAL PRIMARY KEY,
   title VARCHAR(150) NOT NULL,
@@ -221,6 +245,19 @@ async function migrate() {
 
     // Fila única de información general de la iglesia (queda vacía hasta que el superadmin la llene).
     await pool.query(`INSERT INTO church_info (id) VALUES (1) ON CONFLICT (id) DO NOTHING`);
+
+    // Servicios recurrentes por defecto — solo la primera vez (si la tabla está vacía), para no duplicar
+    // si el admin ya los editó o borró después.
+    const { rows: existingServices } = await pool.query('SELECT COUNT(*) FROM church_services');
+    if (Number(existingServices[0].count) === 0) {
+      await pool.query(
+        `INSERT INTO church_services (name, day_of_week, time_label, order_index) VALUES
+         ('Servicio dominical (mañana)', 0, '10:00 AM', 0),
+         ('Servicio dominical (tarde)', 0, '5:00 PM', 1),
+         ('Servicio de miércoles', 3, '6:00 PM', 2)`
+      );
+      console.log('Servicios recurrentes por defecto creados.');
+    }
 
     // Categorías de finanzas por defecto (el admin puede agregar más luego desde el portal).
     const defaultCategories = [
