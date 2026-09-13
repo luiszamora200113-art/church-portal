@@ -103,7 +103,7 @@ router.post('/create-member', requireAuth, requireRole('admin', 'superadmin'), a
 
     // Notificación de bienvenida dentro del portal.
     await pool.query(
-      `INSERT INTO notifications (user_id, title, message) VALUES ($1, $2, $3)`,
+      `INSERT INTO notifications (user_id, title, message, expires_at) VALUES ($1, $2, $3, NOW() + INTERVAL '1 day')`,
       [
         rows[0].id,
         'Bienvenido al portal',
@@ -139,7 +139,7 @@ router.patch('/members/:id/reset-password', requireAuth, requireRole('admin', 's
   if (rows.length === 0) return res.status(404).json({ error: 'Miembro no encontrado.' });
 
   await pool.query(
-    `INSERT INTO notifications (user_id, title, message) VALUES ($1, $2, $3)`,
+    `INSERT INTO notifications (user_id, title, message, expires_at) VALUES ($1, $2, $3, NOW() + INTERVAL '1 day')`,
     [req.params.id, 'Tu contraseña fue restablecida', 'Un administrador restableció tu contraseña. Pide tu nueva contraseña temporal y cámbiala al ingresar.']
   );
 
