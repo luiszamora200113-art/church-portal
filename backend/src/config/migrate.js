@@ -134,6 +134,33 @@ CREATE TABLE IF NOT EXISTS custom_templates (
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+-- Información general de la iglesia ("Conócenos"): una sola fila (id=1), editable por el superadmin.
+CREATE TABLE IF NOT EXISTS church_info (
+  id INTEGER PRIMARY KEY DEFAULT 1,
+  vision TEXT,
+  mission TEXT,
+  address TEXT,
+  schedule_info TEXT,
+  facebook VARCHAR(255),
+  instagram VARCHAR(255),
+  whatsapp VARCHAR(50),
+  contact_phone VARCHAR(50),
+  contact_email VARCHAR(150),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  CONSTRAINT single_row CHECK (id = 1)
+);
+
+-- Líderes de la congregación mostrados en "Conócenos". La foto se guarda como imagen embebida (base64),
+-- para no depender de almacenamiento de archivos externo (Railway no conserva archivos entre despliegues).
+CREATE TABLE IF NOT EXISTS church_leaders (
+  id SERIAL PRIMARY KEY,
+  full_name VARCHAR(150) NOT NULL,
+  role_title VARCHAR(150) NOT NULL,
+  photo_data TEXT,
+  order_index INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS document_templates (
   id SERIAL PRIMARY KEY,
   title VARCHAR(150) NOT NULL,
@@ -191,6 +218,9 @@ async function migrate() {
       await pool.query(stmt);
     }
     console.log('Columnas nuevas verificadas.');
+
+    // Fila única de información general de la iglesia (queda vacía hasta que el superadmin la llene).
+    await pool.query(`INSERT INTO church_info (id) VALUES (1) ON CONFLICT (id) DO NOTHING`);
 
     // Categorías de finanzas por defecto (el admin puede agregar más luego desde el portal).
     const defaultCategories = [
