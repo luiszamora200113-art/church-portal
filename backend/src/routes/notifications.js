@@ -6,6 +6,9 @@ const router = express.Router();
 
 // GET /api/notifications -> notificaciones del usuario autenticado
 router.get('/', requireAuth, async (req, res) => {
+  // Limpieza perezosa: borra las vencidas (de cualquier usuario) cada vez que alguien consulta.
+  await pool.query('DELETE FROM notifications WHERE expires_at IS NOT NULL AND expires_at < NOW()');
+
   const { rows } = await pool.query(
     'SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50',
     [req.user.id]
