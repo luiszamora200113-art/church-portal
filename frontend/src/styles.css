@@ -38,10 +38,44 @@ button { font-family: inherit; }
 }
 .topnav .brand { display: flex; align-items: center; gap: 10px; font-family: 'Fraunces', serif; font-weight: 600; font-size: 16px; }
 .topnav .brand-logo { height: 28px; width: auto; display: block; }
-.topnav nav { display: flex; gap: 22px; font-size: 13px; }
+.topnav nav { display: flex; gap: 22px; font-size: 13px; align-items: center; }
 .topnav nav a, .topnav nav a:visited { color: #cfd8cf; text-decoration: none; }
 .topnav nav a.active { color: #fff; font-weight: 600; border-bottom: 2px solid var(--gold); padding-bottom: 4px; }
-@media (max-width: 720px) { .topnav nav { display: none; } }
+.nav-toggle {
+  display: none;
+  background: none;
+  border: none;
+  color: #eee9dc;
+  font-size: 22px;
+  line-height: 1;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.nav-logout { display: none; }
+@media (max-width: 720px) {
+  .nav-toggle { display: block; }
+  .topnav nav {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    background: var(--moss-dark);
+    padding: 6px 0 14px;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.25);
+  }
+  .topnav { position: relative; }
+  .topnav nav.open { display: flex; }
+  .topnav nav a {
+    padding: 14px 24px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .topnav nav a.active { border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .nav-logout { display: block; color: #e8b4b4 !important; }
+}
 
 /* ---- login ---- */
 .auth-page {
