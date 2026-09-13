@@ -78,12 +78,12 @@ function Nav() {
       </button>
       <nav className={menuOpen ? 'open' : ''}>
         <Link className={linkClass('/dashboard')} to="/dashboard">Inicio</Link>
+        <Link className={linkClass('/conocenos')} to="/conocenos">Conócenos</Link>
         <Link className={linkClass('/deberes')} to="/deberes">Mis privilegios</Link>
         <Link className={linkClass('/mi-celula')} to="/mi-celula">Mi célula</Link>
         <Link className={linkClass('/finanzas')} to="/finanzas">Finanzas</Link>
         <Link className={linkClass('/eventos')} to="/eventos">Eventos</Link>
         <Link className={linkClass('/programacion')} to="/programacion">Programación</Link>
-        <Link className={linkClass('/conocenos')} to="/conocenos">Conócenos</Link>
         {['admin', 'superadmin', 'secretary'].includes(user.role) && (
           <Link className={linkClass('/documentos')} to="/documentos">Documentos</Link>
         )}
