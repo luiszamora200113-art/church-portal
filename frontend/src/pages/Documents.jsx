@@ -22,9 +22,19 @@ function Accordion({ title, subtitle, icon, children }) {
 }
 
 function CustomTemplateForm({ template, roster, token, API_URL }) {
-  const emptyHeader = () => Object.fromEntries(template.header_fields.map((f) => [f.key, '']));
+  const emptyHeader = () => Object.fromEntries(
+    template.header_fields.flatMap((f) => {
+      if (f.type === 'miembro') return [[f.key, ''], [`${f.key}_user_id`, '']];
+      if (f.type === 'miembros') return [[f.key, ''], [`${f.key}_user_ids`, []]];
+      return [[f.key, '']];
+    })
+  );
   const emptyRow = () => Object.fromEntries(
-    template.row_fields.flatMap((f) => (f.type === 'miembro' ? [[f.key, ''], [`${f.key}_user_id`, '']] : [[f.key, '']]))
+    template.row_fields.flatMap((f) => {
+      if (f.type === 'miembro') return [[f.key, ''], [`${f.key}_user_id`, '']];
+      if (f.type === 'miembros') return [[f.key, ''], [`${f.key}_user_ids`, []]];
+      return [[f.key, '']];
+    })
   );
 
   const [title, setTitle] = useState('');
@@ -39,6 +49,15 @@ function CustomTemplateForm({ template, roster, token, API_URL }) {
     } else {
       setHeader((h) => ({ ...h, [f.key]: field }));
     }
+  }
+
+  function toggleHeaderMulti(f, memberId) {
+    setHeader((h) => {
+      const current = h[`${f.key}_user_ids`] || [];
+      const next = current.includes(memberId) ? current.filter((id) => id !== memberId) : [...current, memberId];
+      const names = roster.filter((m) => next.includes(m.id)).map((m) => m.full_name).join(', ');
+      return { ...h, [f.key]: names, [`${f.key}_user_ids`]: next };
+    });
   }
 
   function updateRowField(idx, f, value) {
@@ -60,6 +79,22 @@ function CustomTemplateForm({ template, roster, token, API_URL }) {
           <option value="">Elegir miembro…</option>
           {roster.map((m) => <option key={m.id} value={m.id}>{m.full_name}</option>)}
         </select>
+      );
+    }
+    if (f.type === 'miembros') {
+      const selected = header[`${f.key}_user_ids`] || [];
+      return (
+        <div style={{ border: '1px solid var(--line)', borderRadius: 10, padding: '10px 14px', maxHeight: 220, overflowY: 'auto' }}>
+          {roster.map((m) => (
+            <label key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 400, textTransform: 'none', letterSpacing: 0, fontSize: 14, padding: '4px 0' }}>
+              <input type="checkbox" checked={selected.includes(m.id)} onChange={() => toggleHeaderMulti(f, m.id)} />
+              {m.full_name}
+            </label>
+          ))}
+          {selected.length > 0 && (
+            <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>{selected.length} seleccionado(s): {header[f.key]}</p>
+          )}
+        </div>
       );
     }
     return <input value={value} onChange={(e) => onChange(e.target.value)} />;
