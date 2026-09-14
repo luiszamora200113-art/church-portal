@@ -3,7 +3,7 @@ const pool = require('../config/db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
-const VALID_FIELD_TYPES = ['texto', 'fecha', 'miembro'];
+const VALID_FIELD_TYPES = ['texto', 'fecha', 'miembro', 'miembros'];
 
 function validateFields(fields) {
   if (!Array.isArray(fields)) return false;
@@ -57,6 +57,31 @@ router.post('/', requireAuth, requireRole('superadmin'), async (req, res) => {
     console.error(err);
     res.status(500).json({ error: 'Error del servidor al crear la plantilla.' });
   }
+});
+
+// PUT /api/custom-templates/:id -> editar una plantilla existente (solo superadmin)
+router.put('/:id', requireAuth, requireRole('superadmin'), async (req, res) => {
+  const { name, description, icon, header_fields, row_fields, allowed_roles } = req.body;
+
+  if (!name || !name.trim()) return res.status(400).json({ error: 'El nombre es requerido.' });
+  if (!validateFields(header_fields || [])) return res.status(400).json({ error: 'Campos de encabezado inválidos.' });
+  if (!validateFields(row_fields || [])) return res.status(400).json({ error: 'Campos de tabla inválidos.' });
+
+  const { rows } = await pool.query(
+    `UPDATE custom_templates SET name=$1, description=$2, icon=$3, header_fields=$4, row_fields=$5, allowed_roles=$6
+     WHERE id=$7 RETURNING *`,
+    [
+      name.trim(),
+      description || null,
+      icon || '📄',
+      JSON.stringify(header_fields || []),
+      JSON.stringify(row_fields || []),
+      allowed_roles && allowed_roles.length > 0 ? JSON.stringify(allowed_roles) : null,
+      req.params.id,
+    ]
+  );
+  if (rows.length === 0) return res.status(404).json({ error: 'No encontrada.' });
+  res.json(rows[0]);
 });
 
 // DELETE /api/custom-templates/:id -> quitar una plantilla (solo superadmin). No borra programaciones ya enviadas con ese tipo.
