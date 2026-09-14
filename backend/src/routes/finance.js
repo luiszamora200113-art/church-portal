@@ -46,7 +46,7 @@ router.get('/categories', requireAuth, async (req, res) => {
 });
 
 // POST /api/finance/categories -> crear nueva categoría (solo admin)
-router.post('/categories', requireAuth, requireRole('admin', 'superadmin'), async (req, res) => {
+router.post('/categories', requireAuth, requireRole('admin', 'superadmin', 'finance'), async (req, res) => {
   const { name, color } = req.body;
   if (!name) return res.status(400).json({ error: 'El nombre de la categoría es requerido.' });
 
@@ -64,7 +64,7 @@ router.post('/categories', requireAuth, requireRole('admin', 'superadmin'), asyn
 });
 
 // POST /api/finance/entries -> registrar un monto (solo admin)
-router.post('/entries', requireAuth, requireRole('admin', 'superadmin'), async (req, res) => {
+router.post('/entries', requireAuth, requireRole('admin', 'superadmin', 'finance'), async (req, res) => {
   const { category_id, amount, entry_month, note } = req.body;
   if (!category_id || !amount || !entry_month) {
     return res.status(400).json({ error: 'category_id, amount y entry_month son requeridos.' });
@@ -79,7 +79,7 @@ router.post('/entries', requireAuth, requireRole('admin', 'superadmin'), async (
 });
 
 // GET /api/finance/entries -> lista de movimientos recientes, con nombre de categoría (solo admin)
-router.get('/entries', requireAuth, requireRole('admin', 'superadmin'), async (req, res) => {
+router.get('/entries', requireAuth, requireRole('admin', 'superadmin', 'finance'), async (req, res) => {
   const { rows } = await pool.query(`
     SELECT fe.*, fc.name AS category_name
     FROM finance_entries fe
@@ -91,7 +91,7 @@ router.get('/entries', requireAuth, requireRole('admin', 'superadmin'), async (r
 });
 
 // PATCH /api/finance/entries/:id -> corregir un monto ya registrado (solo admin)
-router.patch('/entries/:id', requireAuth, requireRole('admin', 'superadmin'), async (req, res) => {
+router.patch('/entries/:id', requireAuth, requireRole('admin', 'superadmin', 'finance'), async (req, res) => {
   const { category_id, amount, entry_month, note } = req.body;
   if (!category_id || !amount || !entry_month) {
     return res.status(400).json({ error: 'category_id, amount y entry_month son requeridos.' });
@@ -106,7 +106,7 @@ router.patch('/entries/:id', requireAuth, requireRole('admin', 'superadmin'), as
 });
 
 // DELETE /api/finance/entries/:id -> borrar un monto registrado por error (solo admin)
-router.delete('/entries/:id', requireAuth, requireRole('admin', 'superadmin'), async (req, res) => {
+router.delete('/entries/:id', requireAuth, requireRole('admin', 'superadmin', 'finance'), async (req, res) => {
   const { rowCount } = await pool.query('DELETE FROM finance_entries WHERE id = $1', [req.params.id]);
   if (rowCount === 0) return res.status(404).json({ error: 'Registro no encontrado.' });
   res.json({ ok: true });
