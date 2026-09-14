@@ -13,7 +13,7 @@ export default function Finance() {
   const [newCatName, setNewCatName] = useState('');
   const [error, setError] = useState('');
 
-  const isAdmin = user && ['admin', 'superadmin'].includes(user.role);
+  const isAdmin = user && ['admin', 'superadmin', 'finance'].includes(user.role);
 
   async function loadData() {
     const [summaryRes, breakdownRes] = await Promise.all([
