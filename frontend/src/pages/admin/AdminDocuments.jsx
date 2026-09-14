@@ -9,7 +9,7 @@ const TYPE_LABELS = {
 };
 
 // Los campos "<algo>_user_id" y "<algo>_cumplido" son metadatos internos, no se muestran tal cual.
-const isDisplayKey = (k) => !k.endsWith('_user_id') && !k.endsWith('_cumplido');
+const isDisplayKey = (k) => !k.endsWith('_user_id') && !k.endsWith('_user_ids') && !k.endsWith('_cumplido');
 
 export default function AdminDocuments() {
   const { token, API_URL } = useAuth();
