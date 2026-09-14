@@ -14,7 +14,11 @@ async function downloadSchedulePdf(id, title, token, API_URL) {
   const res = await fetch(`${API_URL}/api/reports/programacion/${id}.pdf`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) return;
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    alert(data.error || 'No se pudo descargar el PDF.');
+    return;
+  }
   const blob = await res.blob();
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
