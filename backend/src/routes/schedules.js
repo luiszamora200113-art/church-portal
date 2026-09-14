@@ -183,22 +183,42 @@ router.patch('/:id/review', requireAuth, requireRole('admin', 'superadmin'), asy
 
     for (const data of allSources) {
       for (const [key, value] of Object.entries(data || {})) {
-        if (!key.endsWith('_user_id') || !value) continue;
-        const baseField = key.replace('_user_id', '');
-        const label = prettyLabel(baseField);
         const dateLabel = data.fecha
           ? new Date(data.fecha).toLocaleDateString('es-NI', { day: 'numeric', month: 'long' })
           : '';
-        await pool.query(
-          `INSERT INTO notifications (user_id, title, message, expires_at, schedule_id) VALUES ($1, $2, $3, $4, $5)`,
-          [
-            value,
-            'Se te asignó un privilegio',
-            `Te toca "${label}"${dateLabel ? ` el ${dateLabel}` : ''} en "${schedule.title}".`,
-            data.fecha || null, // se elimina sola en cuanto pasa la fecha del evento/reunión
-            schedule.id, // y también se elimina al toque si el evento se borra por completo
-          ]
-        );
+
+        // Campo de un solo miembro (ej. "lectura_user_id"): "Te toca X en Y".
+        if (key.endsWith('_user_id') && value) {
+          const baseField = key.replace('_user_id', '');
+          const label = prettyLabel(baseField);
+          await pool.query(
+            `INSERT INTO notifications (user_id, title, message, expires_at, schedule_id) VALUES ($1, $2, $3, $4, $5)`,
+            [
+              value,
+              'Se te asignó un privilegio',
+              `Te toca "${label}"${dateLabel ? ` el ${dateLabel}` : ''} en "${schedule.title}".`,
+              data.fecha || null, // se elimina sola en cuanto pasa la fecha del evento/reunión
+              schedule.id, // y también se elimina al toque si el evento se borra por completo
+            ]
+          );
+        }
+
+        // Campo de varios miembros (ej. "convocados_user_ids"): "Fuiste convocado a Y", uno por persona.
+        if (key.endsWith('_user_ids') && Array.isArray(value)) {
+          for (const userId of value) {
+            if (!userId) continue;
+            await pool.query(
+              `INSERT INTO notifications (user_id, title, message, expires_at, schedule_id) VALUES ($1, $2, $3, $4, $5)`,
+              [
+                userId,
+                'Fuiste convocado a una reunión',
+                `"${schedule.title}"${dateLabel ? ` el ${dateLabel}` : ''}.`,
+                data.fecha || null,
+                schedule.id,
+              ]
+            );
+          }
+        }
       }
     }
   }
@@ -223,17 +243,30 @@ router.get('/assignments/mine', requireAuth, async (req, res) => {
   // De las filas de tabla (ej. lectura_user_id en cada fecha)
   for (const row of rowData) {
     for (const [key, value] of Object.entries(row.data || {})) {
-      if (!key.endsWith('_user_id') || Number(value) !== req.user.id) continue;
-      if (row.data.fecha && row.data.fecha < today) continue;
-      const baseField = key.replace('_user_id', '');
-      assignments.push({
-        schedule_id: row.schedule_id,
-        schedule_title: row.title,
-        field: baseField,
-        label: prettyLabel(baseField),
-        fecha: row.data.fecha || null,
-        completed: !!row.data[`${baseField}_cumplido`],
-      });
+      if (key.endsWith('_user_id') && Number(value) === req.user.id) {
+        if (row.data.fecha && row.data.fecha < today) continue;
+        const baseField = key.replace('_user_id', '');
+        assignments.push({
+          schedule_id: row.schedule_id,
+          schedule_title: row.title,
+          field: baseField,
+          label: prettyLabel(baseField),
+          fecha: row.data.fecha || null,
+          completed: !!row.data[`${baseField}_cumplido`],
+        });
+      }
+      if (key.endsWith('_user_ids') && Array.isArray(value) && value.map(Number).includes(req.user.id)) {
+        if (row.data.fecha && row.data.fecha < today) continue;
+        const baseField = key.replace('_user_ids', '');
+        assignments.push({
+          schedule_id: row.schedule_id,
+          schedule_title: row.title,
+          field: baseField,
+          label: 'Convocatoria',
+          fecha: row.data.fecha || null,
+          completed: false,
+        });
+      }
     }
   }
 
@@ -242,16 +275,28 @@ router.get('/assignments/mine', requireAuth, async (req, res) => {
     const fecha = sched.reference_date ? sched.reference_date.toISOString().slice(0, 10) : null;
     if (fecha && fecha < today) continue;
     for (const [key, value] of Object.entries(sched.meta || {})) {
-      if (!key.endsWith('_user_id') || Number(value) !== req.user.id) continue;
-      const baseField = key.replace('_user_id', '');
-      assignments.push({
-        schedule_id: sched.id,
-        schedule_title: sched.title,
-        field: baseField,
-        label: prettyLabel(baseField),
-        fecha,
-        completed: !!sched.meta[`${baseField}_cumplido`],
-      });
+      if (key.endsWith('_user_id') && Number(value) === req.user.id) {
+        const baseField = key.replace('_user_id', '');
+        assignments.push({
+          schedule_id: sched.id,
+          schedule_title: sched.title,
+          field: baseField,
+          label: prettyLabel(baseField),
+          fecha,
+          completed: !!sched.meta[`${baseField}_cumplido`],
+        });
+      }
+      if (key.endsWith('_user_ids') && Array.isArray(value) && value.map(Number).includes(req.user.id)) {
+        const baseField = key.replace('_user_ids', '');
+        assignments.push({
+          schedule_id: sched.id,
+          schedule_title: sched.title,
+          field: baseField,
+          label: 'Convocatoria',
+          fecha,
+          completed: false,
+        });
+      }
     }
   }
 
@@ -277,38 +322,72 @@ router.get('/assignments/all', requireAuth, requireRole('admin', 'superadmin'), 
 
   for (const row of rowData) {
     for (const [key, value] of Object.entries(row.data || {})) {
-      if (!key.endsWith('_user_id') || !value) continue;
-      const baseField = key.replace('_user_id', '');
-      assignments.push({
-        schedule_id: row.schedule_id,
-        row_id: row.row_id,
-        schedule_title: row.title,
-        field: baseField,
-        label: prettyLabel(baseField),
-        fecha: row.data.fecha || null,
-        user_id: Number(value),
-        user_name: nameOf(value),
-        completed: !!row.data[`${baseField}_cumplido`],
-      });
+      if (key.endsWith('_user_id') && value) {
+        const baseField = key.replace('_user_id', '');
+        assignments.push({
+          schedule_id: row.schedule_id,
+          row_id: row.row_id,
+          schedule_title: row.title,
+          field: baseField,
+          label: prettyLabel(baseField),
+          fecha: row.data.fecha || null,
+          user_id: Number(value),
+          user_name: nameOf(value),
+          completed: !!row.data[`${baseField}_cumplido`],
+        });
+      }
+      if (key.endsWith('_user_ids') && Array.isArray(value)) {
+        const baseField = key.replace('_user_ids', '');
+        value.filter(Boolean).forEach((uid) => {
+          assignments.push({
+            schedule_id: row.schedule_id,
+            row_id: row.row_id,
+            schedule_title: row.title,
+            field: baseField,
+            label: 'Convocatoria',
+            fecha: row.data.fecha || null,
+            user_id: Number(uid),
+            user_name: nameOf(uid),
+            completed: false,
+          });
+        });
+      }
     }
   }
 
   for (const sched of approved) {
     const fecha = sched.reference_date ? sched.reference_date.toISOString().slice(0, 10) : null;
     for (const [key, value] of Object.entries(sched.meta || {})) {
-      if (!key.endsWith('_user_id') || !value) continue;
-      const baseField = key.replace('_user_id', '');
-      assignments.push({
-        schedule_id: sched.id,
-        row_id: null,
-        schedule_title: sched.title,
-        field: baseField,
-        label: prettyLabel(baseField),
-        fecha,
-        user_id: Number(value),
-        user_name: nameOf(value),
-        completed: !!sched.meta[`${baseField}_cumplido`],
-      });
+      if (key.endsWith('_user_id') && value) {
+        const baseField = key.replace('_user_id', '');
+        assignments.push({
+          schedule_id: sched.id,
+          row_id: null,
+          schedule_title: sched.title,
+          field: baseField,
+          label: prettyLabel(baseField),
+          fecha,
+          user_id: Number(value),
+          user_name: nameOf(value),
+          completed: !!sched.meta[`${baseField}_cumplido`],
+        });
+      }
+      if (key.endsWith('_user_ids') && Array.isArray(value)) {
+        const baseField = key.replace('_user_ids', '');
+        value.filter(Boolean).forEach((uid) => {
+          assignments.push({
+            schedule_id: sched.id,
+            row_id: null,
+            schedule_title: sched.title,
+            field: baseField,
+            label: 'Convocatoria',
+            fecha,
+            user_id: Number(uid),
+            user_name: nameOf(uid),
+            completed: false,
+          });
+        });
+      }
     }
   }
 
