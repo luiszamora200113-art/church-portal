@@ -4,7 +4,8 @@ import { useAuth } from '../../context/AuthContext.jsx';
 const FIELD_TYPES = [
   { value: 'texto', label: 'Texto libre' },
   { value: 'fecha', label: 'Fecha' },
-  { value: 'miembro', label: 'Elegir miembro (notifica automático)' },
+  { value: 'miembro', label: 'Elegir un miembro (notifica automático)' },
+  { value: 'miembros', label: 'Elegir varios miembros (convoca a todos)' },
 ];
 const ROLE_OPTIONS = [
   { value: 'member', label: 'Miembro' },
@@ -22,7 +23,6 @@ function FieldBuilder({ title, hint, fields, setFields }) {
   function updateField(i, patch) {
     const copy = [...fields];
     copy[i] = { ...copy[i], ...patch };
-    // Genera la "key" automáticamente a partir de la etiqueta (para guardar los datos).
     if (patch.label !== undefined) {
       copy[i].key = patch.label.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
     }
@@ -60,6 +60,7 @@ function FieldBuilder({ title, hint, fields, setFields }) {
 export default function AdminTemplates() {
   const { user, token, API_URL } = useAuth();
   const [templates, setTemplates] = useState([]);
+  const [editingId, setEditingId] = useState(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [icon, setIcon] = useState('📄');
@@ -82,33 +83,58 @@ export default function AdminTemplates() {
     setAllowedRoles((r) => (r.includes(role) ? r.filter((x) => x !== role) : [...r, role]));
   }
 
-  async function handleCreate(e) {
+  function resetForm() {
+    setEditingId(null);
+    setName(''); setDescription(''); setIcon('📄');
+    setHeaderFields([emptyField()]); setRowFields([]); setAllowedRoles([]);
+    setError(''); setMessage('');
+  }
+
+  function startEdit(t) {
+    setEditingId(t.id);
+    setName(t.name);
+    setDescription(t.description || '');
+    setIcon(t.icon);
+    setHeaderFields(t.header_fields.length ? t.header_fields : [emptyField()]);
+    setRowFields(t.row_fields);
+    setAllowedRoles(t.allowed_roles || []);
+    setError(''); setMessage('');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  async function handleSubmit(e) {
     e.preventDefault();
     setError(''); setMessage('');
     if (!name.trim()) return setError('El nombre es requerido.');
 
-    const res = await fetch(`${API_URL}/api/custom-templates`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({
-        name, description, icon,
-        header_fields: headerFields.filter((f) => f.label.trim()),
-        row_fields: rowFields.filter((f) => f.label.trim()),
-        allowed_roles: allowedRoles,
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok) return setError(data.error || 'No se pudo crear la plantilla.');
+    const body = {
+      name, description, icon,
+      header_fields: headerFields.filter((f) => f.label.trim()),
+      row_fields: rowFields.filter((f) => f.label.trim()),
+      allowed_roles: allowedRoles,
+    };
 
-    setMessage(`Plantilla "${data.name}" creada. Ya aparece en Documentos para quien pueda usarla.`);
-    setName(''); setDescription(''); setIcon('📄');
-    setHeaderFields([emptyField()]); setRowFields([]); setAllowedRoles([]);
+    const res = await fetch(
+      editingId ? `${API_URL}/api/custom-templates/${editingId}` : `${API_URL}/api/custom-templates`,
+      {
+        method: editingId ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      }
+    );
+    const data = await res.json();
+    if (!res.ok) return setError(data.error || 'No se pudo guardar la plantilla.');
+
+    const successMsg = editingId ? `Plantilla "${data.name}" actualizada.` : `Plantilla "${data.name}" creada. Ya aparece en Documentos para quien pueda usarla.`;
+    resetForm();
+    setMessage(successMsg);
     loadTemplates();
   }
 
   async function handleDelete(id) {
     if (!window.confirm('¿Quitar esta plantilla? Ya no aparecerá para llenar (lo ya enviado se conserva).')) return;
     await fetch(`${API_URL}/api/custom-templates/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+    if (editingId === id) resetForm();
     loadTemplates();
   }
 
@@ -123,8 +149,8 @@ export default function AdminTemplates() {
         Crea un tipo de documento nuevo (ej. "Solicitud de equipo") sin necesitar programación. Define los campos y el sistema arma el formulario solo.
       </p>
 
-      <form className="card" onSubmit={handleCreate}>
-        <h2>Nueva plantilla</h2>
+      <form className="card" onSubmit={handleSubmit}>
+        <h2>{editingId ? 'Editar plantilla' : 'Nueva plantilla'}</h2>
         <label>Nombre</label>
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej. Solicitud de equipo" required />
         <label>Descripción corta (opcional)</label>
@@ -134,13 +160,13 @@ export default function AdminTemplates() {
 
         <FieldBuilder
           title="Campos generales (una sola vez por documento)"
-          hint='Ej. "Fecha", "Lugar", "Encargado" — cada uno con su tipo.'
+          hint='Ej. "Fecha", "Lugar", "Líderes convocados" — cada uno con su tipo.'
           fields={headerFields}
           setFields={setHeaderFields}
         />
         <FieldBuilder
           title="Columnas de tabla (opcional — filas repetibles)"
-          hint='Déjalo vacío si esta plantilla no necesita una tabla. Ej. para un horario: "Hora", "Actividad", "Responsable".'
+          hint='Déjalo vacío si esta plantilla no necesita una tabla. Ej. para una agenda: "Punto a tratar", "Responsable".'
           fields={rowFields}
           setFields={setRowFields}
         />
@@ -154,11 +180,14 @@ export default function AdminTemplates() {
             </label>
           ))}
         </div>
-        <p className="muted" style={{ fontSize: 12, marginTop: -6 }}>Si no marcas ninguno, cualquier miembro podrá enviarla.</p>
+        <p className="muted" style={{ fontSize: 12, marginTop: -6 }}>Si no marcas ninguno, cualquier miembro podrá enviarla. Admin y Superadmin siempre pueden, sin importar esta selección.</p>
 
         {error && <p className="error">{error}</p>}
         {message && <p className="success">{message}</p>}
-        <button className="primary" type="submit">Crear plantilla</button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button className="primary" type="submit">{editingId ? 'Guardar cambios' : 'Crear plantilla'}</button>
+          {editingId && <button type="button" className="btn-outline" onClick={resetForm}>Cancelar edición</button>}
+        </div>
       </form>
 
       <div className="card">
@@ -171,6 +200,7 @@ export default function AdminTemplates() {
               <strong>{t.name}</strong>
               {t.description && <p className="muted" style={{ fontSize: 12, margin: '2px 0 0' }}>{t.description}</p>}
             </div>
+            <button className="btn-outline" style={{ fontSize: 12, padding: '5px 10px' }} onClick={() => startEdit(t)}>Editar</button>
             <button className="btn-outline" style={{ fontSize: 12, padding: '5px 10px' }} onClick={() => handleDelete(t.id)}>Quitar</button>
           </div>
         ))}
