@@ -4,8 +4,18 @@ const { requireAuth, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 
-// GET /api/finance/summary -> total general + ingresos del mes en curso (todos los miembros)
-router.get('/summary', requireAuth, async (req, res) => {
+// Los roles admin/superadmin/finance siempre pueden. Cualquier otro necesita can_view_finance = true,
+// que el admin activa persona por persona — se revisa en vivo (no en el token) para que el cambio
+// surta efecto de inmediato, sin esperar a que la persona vuelva a iniciar sesión.
+async function requireFinanceAccess(req, res, next) {
+  if (['admin', 'superadmin', 'finance'].includes(req.user.role)) return next();
+  const { rows } = await pool.query('SELECT can_view_finance FROM users WHERE id = $1', [req.user.id]);
+  if (rows[0]?.can_view_finance) return next();
+  return res.status(403).json({ error: 'No tienes acceso a la sección de Finanzas.' });
+}
+
+// GET /api/finance/summary -> total general + ingresos del mes en curso
+router.get('/summary', requireAuth, requireFinanceAccess, async (req, res) => {
   const { rows: totalRows } = await pool.query('SELECT COALESCE(SUM(amount), 0) AS total FROM finance_entries');
 
   const { rows: monthRows } = await pool.query(`
@@ -22,7 +32,7 @@ router.get('/summary', requireAuth, async (req, res) => {
 
 // GET /api/finance/breakdown -> desglose por categoría. Todos ven el mes en curso;
 // solo admin/superadmin/finance pueden pasar ?month=YYYY-MM-DD para ver meses anteriores.
-router.get('/breakdown', requireAuth, async (req, res) => {
+router.get('/breakdown', requireAuth, requireFinanceAccess, async (req, res) => {
   const canSeeHistory = ['admin', 'superadmin', 'finance'].includes(req.user.role);
   const month = canSeeHistory && req.query.month ? req.query.month : null;
 
@@ -40,7 +50,7 @@ router.get('/breakdown', requireAuth, async (req, res) => {
 });
 
 // GET /api/finance/categories -> lista de categorías (para el formulario de admin)
-router.get('/categories', requireAuth, async (req, res) => {
+router.get('/categories', requireAuth, requireFinanceAccess, async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM finance_categories ORDER BY name');
   res.json(rows);
 });
