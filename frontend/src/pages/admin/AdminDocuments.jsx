@@ -6,6 +6,7 @@ const TYPE_LABELS = {
   culto_mensual: 'Programación del mes',
   celula: 'Programación de célula',
   escuela_dominical: 'Escuela Dominical',
+  ministerio: 'Programación de Ministerio',
 };
 
 // Los campos "<algo>_user_id" y "<algo>_cumplido" son metadatos internos, no se muestran tal cual.
