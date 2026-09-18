@@ -64,7 +64,7 @@ router.get('/roster', requireAuth, async (req, res) => {
 // GET /api/cells/members-overview -> lista de miembros con su célula actual (solo admin, para reasignar)
 router.get('/members-overview', requireAuth, requireRole('admin', 'superadmin', 'secretary'), async (req, res) => {
   const { rows } = await pool.query(`
-    SELECT u.id, u.full_name, u.phone, u.is_active, u.role, u.cell_id, c.name AS cell_name
+    SELECT u.id, u.full_name, u.phone, u.is_active, u.role, u.cell_id, u.can_view_finance, c.name AS cell_name
     FROM users u
     LEFT JOIN cells c ON c.id = u.cell_id
     WHERE u.role IN ('member', 'finance', 'secretary', 'education')
