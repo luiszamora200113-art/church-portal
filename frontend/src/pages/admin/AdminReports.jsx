@@ -5,6 +5,7 @@ export default function AdminReports() {
   const { token, API_URL } = useAuth();
   const [titheStatus, setTitheStatus] = useState([]);
   const [cells, setCells] = useState([]);
+  const [selectedCell, setSelectedCell] = useState('');
 
   useEffect(() => {
     fetch(`${API_URL}/api/tithe/status`, { headers: { Authorization: `Bearer ${token}` } })
@@ -20,6 +21,11 @@ export default function AdminReports() {
   // Los PDFs requieren el token; se descargan como blob y se disparan como archivo.
   async function downloadPdf(path, filename) {
     const res = await fetch(`${API_URL}${path}`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || 'No se pudo generar el reporte.');
+      return;
+    }
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -27,6 +33,16 @@ export default function AdminReports() {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  function downloadMembersReport() {
+    if (!selectedCell) {
+      downloadPdf('/api/reports/miembros.pdf', 'reporte-miembros-todas.pdf');
+      return;
+    }
+    const cell = cells.find((c) => String(c.id) === selectedCell);
+    const safeName = cell ? cell.name.replace(/[^a-z0-9]+/gi, '-') : selectedCell;
+    downloadPdf(`/api/reports/miembros.pdf?cell_id=${selectedCell}`, `reporte-miembros-${safeName}.pdf`);
   }
 
   return (
@@ -42,18 +58,19 @@ export default function AdminReports() {
           <button className="btn-outline" onClick={() => downloadPdf('/api/reports/diezmos.pdf', 'reporte-diezmos.pdf')}>
             Estado de diezmo
           </button>
-          <button className="btn-outline" onClick={() => downloadPdf('/api/reports/miembros.pdf', 'reporte-miembros-todas.pdf')}>
-            Miembros — todas las células
+        </div>
+
+        <label style={{ marginTop: 18 }}>Reporte de miembros</label>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          <select value={selectedCell} onChange={(e) => setSelectedCell(e.target.value)} style={{ maxWidth: 260 }}>
+            <option value="">Todos los miembros</option>
+            {cells.map((c) => (
+              <option key={c.id} value={c.id}>Solo {c.name}</option>
+            ))}
+          </select>
+          <button className="primary" style={{ marginTop: 0, width: 'auto', padding: '10px 18px' }} onClick={downloadMembersReport}>
+            Descargar PDF
           </button>
-          {cells.map((c) => (
-            <button
-              key={c.id}
-              className="btn-outline"
-              onClick={() => downloadPdf(`/api/reports/miembros.pdf?cell_id=${c.id}`, `reporte-miembros-${c.name.replace(/[^a-z0-9]+/gi, '-')}.pdf`)}
-            >
-              Miembros — {c.name}
-            </button>
-          ))}
         </div>
       </div>
 
