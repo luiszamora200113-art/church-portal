@@ -67,7 +67,7 @@ router.get('/members-overview', requireAuth, requireRole('admin', 'superadmin', 
     SELECT u.id, u.full_name, u.phone, u.is_active, u.role, u.cell_id, u.can_view_finance, c.name AS cell_name
     FROM users u
     LEFT JOIN cells c ON c.id = u.cell_id
-    WHERE u.role IN ('member', 'finance', 'secretary', 'education')
+    WHERE u.role IN ('member', 'finance', 'secretary', 'education', 'admin', 'superadmin')
     ORDER BY u.full_name
   `);
   res.json(rows);
