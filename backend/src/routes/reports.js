@@ -117,7 +117,7 @@ function drawTable(doc, columns, rows, { startY } = {}) {
 }
 
 // GET /api/reports/finanzas.pdf -> desglose de finanzas del mes en curso (admin/tesorero)
-router.get('/finanzas.pdf', requireAuth, requireRole('admin', 'superadmin'), async (req, res) => {
+router.get('/finanzas.pdf', requireAuth, requireRole('admin', 'superadmin', 'finance'), async (req, res) => {
   const { rows } = await pool.query(`
     SELECT fc.name, COALESCE(SUM(fe.amount), 0) AS total
     FROM finance_categories fc
@@ -149,7 +149,7 @@ router.get('/finanzas.pdf', requireAuth, requireRole('admin', 'superadmin'), asy
 });
 
 // GET /api/reports/diezmos.pdf -> estado de confirmación de diezmo por miembro (sin montos)
-router.get('/diezmos.pdf', requireAuth, requireRole('admin', 'superadmin'), async (req, res) => {
+router.get('/diezmos.pdf', requireAuth, requireRole('admin', 'superadmin', 'finance'), async (req, res) => {
   const { rows } = await pool.query(
     `SELECT u.full_name, (tc.id IS NOT NULL) AS confirmed
      FROM users u
@@ -177,22 +177,27 @@ router.get('/diezmos.pdf', requireAuth, requireRole('admin', 'superadmin'), asyn
   finish();
 });
 
-// GET /api/reports/miembros.pdf -> listado de miembros agrupado y separado visualmente por célula
+// GET /api/reports/miembros.pdf?cell_id=1 -> listado de miembros, agrupado por célula (o solo una si se filtra)
 router.get('/miembros.pdf', requireAuth, requireRole('admin', 'superadmin'), async (req, res) => {
-  const { rows: cellList } = await pool.query('SELECT id, name FROM cells ORDER BY id');
+  const { cell_id } = req.query;
+  const { rows: cellList } = await pool.query(
+    cell_id ? 'SELECT id, name FROM cells WHERE id = $1 ORDER BY id' : 'SELECT id, name FROM cells ORDER BY id',
+    cell_id ? [cell_id] : []
+  );
   const { rows: members } = await pool.query(`
     SELECT u.full_name, u.cell_id
     FROM users u
-    WHERE u.role = 'member'
+    WHERE u.role = 'member' ${cell_id ? 'AND u.cell_id = $1' : ''}
     ORDER BY u.full_name
-  `);
+  `, cell_id ? [cell_id] : []);
 
   const totalCount = members.length;
-  const { doc, finish } = createLetterheadPdf(res, 'reporte-miembros.pdf', 'Miembros por Célula', `${totalCount} miembros registrados`);
+  const reportTitle = cell_id && cellList[0] ? `Miembros — ${cellList[0].name}` : 'Miembros por Célula';
+  const { doc, finish } = createLetterheadPdf(res, 'reporte-miembros.pdf', reportTitle, `${totalCount} miembros registrados`);
 
   const groups = [
     ...cellList.map((c) => ({ label: c.name, members: members.filter((m) => m.cell_id === c.id) })),
-    { label: 'Sin célula asignada', members: members.filter((m) => !m.cell_id) },
+    ...(cell_id ? [] : [{ label: 'Sin célula asignada', members: members.filter((m) => !m.cell_id) }]),
   ].filter((g) => g.members.length > 0);
 
   groups.forEach((group, i) => {
@@ -219,6 +224,7 @@ const SCHEDULE_TITLES = {
   culto_mensual: 'Programación de Cultos',
   celula: 'Programación de Célula',
   escuela_dominical: 'Escuela Dominical',
+  ministerio: 'Programación de Ministerio',
 };
 const SCHEDULE_COLUMNS = {
   evento: [
@@ -227,6 +233,12 @@ const SCHEDULE_COLUMNS = {
     { key: 'actividad', label: 'Actividad', width: 150 },
     { key: 'participante', label: 'Participante', width: 110 },
     { key: 'notas', label: 'Notas', width: 82 },
+  ],
+  ministerio: [
+    { key: 'fecha', label: 'Fecha', width: 80 },
+    { key: 'servicio', label: 'Servicio', width: 130 },
+    { key: 'miembros', label: 'Sirven', width: 200 },
+    { key: 'notas', label: 'Notas', width: 92 },
   ],
   culto_mensual: [
     { key: 'fecha', label: 'Fecha', width: 90 },
@@ -260,6 +272,16 @@ router.get('/programacion/:id.pdf', requireAuth, async (req, res) => {
     return res.status(403).json({ error: 'No tienes acceso a esta programación aún.' });
   }
 
+  // Un evento deja de poder imprimirse el día después de su fecha para miembros normales —
+  // admin/superadmin conservan acceso siempre, para consulta futura en el Historial.
+  if (schedule.type === 'evento' && schedule.reference_date && !isPrivileged) {
+    const today = new Date().toISOString().slice(0, 10);
+    const eventDate = new Date(schedule.reference_date).toISOString().slice(0, 10);
+    if (eventDate < today) {
+      return res.status(410).json({ error: 'Este evento ya pasó — el programa ya no está disponible para imprimir.' });
+    }
+  }
+
   const { rows: dataRows } = await pool.query(
     'SELECT * FROM schedule_rows WHERE schedule_id = $1 ORDER BY row_order',
     [req.params.id]
@@ -288,7 +310,7 @@ router.get('/programacion/:id.pdf', requireAuth, async (req, res) => {
   const headerFieldDefs = customTemplate?.header_fields || [];
   const metaLabels = Object.fromEntries(headerFieldDefs.map((f) => [f.key, f.label]));
   const metaTypes = Object.fromEntries(headerFieldDefs.map((f) => [f.key, f.type]));
-  const metaLines = Object.entries(meta).filter(([k, v]) => v && !k.endsWith('_user_id') && !k.endsWith('_cumplido'));
+  const metaLines = Object.entries(meta).filter(([k, v]) => v && !k.endsWith('_user_id') && !k.endsWith('_user_ids') && !k.endsWith('_cumplido'));
   if (metaLines.length > 0) {
     doc.font('Helvetica').fontSize(10).fillColor(MUTED);
     metaLines.forEach(([k, v]) => {
