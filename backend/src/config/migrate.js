@@ -103,6 +103,9 @@ ALTER TABLE schedules ADD COLUMN IF NOT EXISTS meta JSONB NOT NULL DEFAULT '{}':
 -- El admin crea la contraseña temporal; el miembro debe cambiarla en su primer ingreso.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT true;
 
+-- Ver Finanzas ya no es automático para todo miembro; el admin autoriza persona por persona.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS can_view_finance BOOLEAN NOT NULL DEFAULT false;
+
 -- Para el tipo 'celula': a qué célula pertenece esa programación (para mostrársela solo a ella).
 ALTER TABLE schedules ADD COLUMN IF NOT EXISTS cell_id INTEGER REFERENCES cells(id);
 
@@ -184,6 +187,26 @@ CREATE TABLE IF NOT EXISTS service_cancellations (
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   UNIQUE(service_id, cancel_date)
 );
+
+-- Ministerios (ej. Ujieres, Alabanza, Jóvenes): el admin los crea y les asigna uno o más líderes.
+-- Un líder puede liderar varios ministerios a la vez.
+CREATE TABLE IF NOT EXISTS ministries (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(150) UNIQUE NOT NULL,
+  description VARCHAR(255),
+  icon VARCHAR(10) NOT NULL DEFAULT '🙏',
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS ministry_leaders (
+  id SERIAL PRIMARY KEY,
+  ministry_id INTEGER NOT NULL REFERENCES ministries(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE(ministry_id, user_id)
+);
+
+-- Para el tipo 'ministerio': a qué ministerio pertenece esa programación.
+ALTER TABLE schedules ADD COLUMN IF NOT EXISTS ministry_id INTEGER REFERENCES ministries(id);
 
 CREATE TABLE IF NOT EXISTS document_templates (
   id SERIAL PRIMARY KEY,
