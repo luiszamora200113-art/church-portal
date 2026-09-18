@@ -146,11 +146,13 @@ export default function Dashboard() {
           <h3>Programación</h3>
           <p>Cultos y temas del mes.</p>
         </Link>
-        <Link to="/finanzas" className="mini-card" style={{ textDecoration: 'none', color: 'inherit' }}>
-          <span className="eyebrow">Transparencia</span>
-          <h3>Finanzas de la iglesia</h3>
-          <p>Consulta los totales del mes (solo lectura).</p>
-        </Link>
+        {(['admin', 'superadmin', 'finance'].includes(user.role) || user.can_view_finance) && (
+          <Link to="/finanzas" className="mini-card" style={{ textDecoration: 'none', color: 'inherit' }}>
+            <span className="eyebrow">Transparencia</span>
+            <h3>Finanzas de la iglesia</h3>
+            <p>Consulta los totales del mes (solo lectura).</p>
+          </Link>
+        )}
       </section>
     </div>
   );
