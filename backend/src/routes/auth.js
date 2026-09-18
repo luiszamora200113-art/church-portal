@@ -172,6 +172,29 @@ router.patch('/members/:id/toggle-active', requireAuth, requireRole('admin', 'su
   res.json(rows[0]);
 });
 
+// DELETE /api/auth/members/:id -> eliminar una cuenta por completo (no solo desactivar).
+// Pensado para cuentas creadas por error, sin actividad todavía. Si ya tiene actividad
+// registrada en otras tablas (programaciones, finanzas, etc.), se rechaza con un mensaje claro
+// en vez de arrastrar ese historial — para eso está "Desactivar".
+router.delete('/members/:id', requireAuth, requireRole('admin', 'superadmin'), async (req, res) => {
+  if (Number(req.params.id) === req.user.id) {
+    return res.status(400).json({ error: 'No puedes eliminar tu propia cuenta.' });
+  }
+  try {
+    const { rowCount } = await pool.query('DELETE FROM users WHERE id = $1', [req.params.id]);
+    if (rowCount === 0) return res.status(404).json({ error: 'Miembro no encontrado.' });
+    res.json({ ok: true });
+  } catch (err) {
+    if (err.code === '23503') {
+      return res.status(409).json({
+        error: 'No se puede eliminar: esta cuenta ya tiene actividad registrada (programaciones, finanzas, etc.). Usa "Desactivar" en su lugar.',
+      });
+    }
+    console.error(err);
+    res.status(500).json({ error: 'Error del servidor al eliminar.' });
+  }
+});
+
 // GET /api/auth/active-members -> listado y conteo de todas las cuentas activas (cualquier credencial cuenta como miembro oficial)
 router.get('/active-members', requireAuth, requireRole('admin', 'superadmin', 'secretary'), async (req, res) => {
   const { rows } = await pool.query(
