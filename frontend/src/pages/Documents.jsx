@@ -170,12 +170,100 @@ function CustomTemplateForm({ template, roster, token, API_URL }) {
   );
 }
 
+function MinistryScheduleForm({ ministry, roster, token, API_URL }) {
+  const emptyRow = () => ({ fecha: '', servicio: '', miembros: '', miembros_user_ids: [], notas: '' });
+  const [form, setForm] = useState({ title: '', reference_date: '' });
+  const [rows, setRows] = useState([emptyRow(), emptyRow()]);
+  const [msg, setMsg] = useState('');
+
+  function updateRow(idx, field, value) {
+    const copy = [...rows];
+    copy[idx] = { ...copy[idx], [field]: value };
+    setRows(copy);
+  }
+
+  function toggleRowMember(idx, memberId) {
+    setRows((r) => {
+      const copy = [...r];
+      const current = copy[idx].miembros_user_ids || [];
+      const next = current.includes(memberId) ? current.filter((id) => id !== memberId) : [...current, memberId];
+      const names = roster.filter((m) => next.includes(m.id)).map((m) => m.full_name).join(', ');
+      copy[idx] = { ...copy[idx], miembros: names, miembros_user_ids: next };
+      return copy;
+    });
+  }
+
+  async function handleSubmit() {
+    setMsg('Enviando…');
+    try {
+      const res = await fetch(`${API_URL}/api/schedules`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ type: 'ministerio', ministry_id: ministry.id, title: form.title, reference_date: form.reference_date || null, rows }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'No se pudo enviar.');
+      setMsg('Enviado. Quedó pendiente de aprobación del pastor.');
+      setForm({ title: '', reference_date: '' });
+      setRows([emptyRow(), emptyRow()]);
+    } catch (err) {
+      setMsg(err.message);
+    }
+  }
+
+  return (
+    <>
+      <label>Título (ej. Programa Ujieres — Octubre 2026)</label>
+      <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
+      <label>Mes que cubre</label>
+      <input type="date" value={form.reference_date} onChange={(e) => setForm((f) => ({ ...f, reference_date: e.target.value }))} />
+
+      <label style={{ marginTop: 14 }}>Quién sirve cada fecha</label>
+      <table className="sched-table" style={{ marginTop: 6 }}>
+        <thead><tr><th>Fecha</th><th>Servicio</th><th>Sirven</th><th>Notas</th></tr></thead>
+        <tbody>
+          {rows.map((row, i) => (
+            <tr key={i}>
+              <td><input type="date" value={row.fecha} onChange={(e) => updateRow(i, 'fecha', e.target.value)} style={{ border: 'none', background: 'transparent', padding: 0 }} /></td>
+              <td><input value={row.servicio} onChange={(e) => updateRow(i, 'servicio', e.target.value)} placeholder="Culto dominical mañana" style={{ border: 'none', background: 'transparent', padding: 0 }} /></td>
+              <td>
+                <details>
+                  <summary style={{ cursor: 'pointer', fontSize: 13 }}>{row.miembros || 'Elegir…'}</summary>
+                  <div style={{ maxHeight: 160, overflowY: 'auto', border: '1px solid var(--line)', borderRadius: 8, padding: 8, marginTop: 4, background: 'var(--card)' }}>
+                    {roster.map((m) => (
+                      <label key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, padding: '3px 0' }}>
+                        <input type="checkbox" checked={(row.miembros_user_ids || []).includes(m.id)} onChange={() => toggleRowMember(i, m.id)} />
+                        {m.full_name}
+                      </label>
+                    ))}
+                  </div>
+                </details>
+              </td>
+              <td><input value={row.notas} onChange={(e) => updateRow(i, 'notas', e.target.value)} style={{ border: 'none', background: 'transparent', padding: 0 }} /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <button className="btn-outline" style={{ marginTop: 8, fontSize: 12 }} onClick={() => setRows((r) => [...r, emptyRow()])}>
+        + Agregar fecha
+      </button>
+      <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+        Al aprobarse, cada persona que elijas recibe notificación y le aparece en su "Mis privilegios".
+      </p>
+
+      {msg && <p className={msg.startsWith('Enviado') ? 'success' : 'error'}>{msg}</p>}
+      <button className="primary" style={{ marginTop: 16 }} onClick={handleSubmit}>Enviar para aprobación</button>
+    </>
+  );
+}
+
 export default function Documents() {
   const { user, token, API_URL } = useAuth();
 
   // --- Plantillas personalizadas creadas por el superadmin ---
   const [customTemplates, setCustomTemplates] = useState([]);
   const [roster, setRoster] = useState([]);
+  const [myMinistries, setMyMinistries] = useState([]);
   useEffect(() => {
     fetch(`${API_URL}/api/custom-templates`, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
@@ -187,6 +275,10 @@ export default function Documents() {
     fetch(`${API_URL}/api/cells/roster`, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
       .then(setRoster)
+      .catch(() => {});
+    fetch(`${API_URL}/api/ministries/mine`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then(setMyMinistries)
       .catch(() => {});
   }, [token]);
 
@@ -475,6 +567,12 @@ export default function Documents() {
           </>
         )}
       </Accordion>
+
+      {myMinistries.map((m) => (
+        <Accordion key={m.id} title={`Programación de ${m.name}`} subtitle="Envíalo y pasa para aprobación del pastor" icon={m.icon}>
+          <MinistryScheduleForm ministry={m} roster={roster} token={token} API_URL={API_URL} />
+        </Accordion>
+      ))}
 
       {customTemplates.map((t) => (
         <Accordion key={t.id} title={t.name} subtitle={t.description || 'Plantilla personalizada'} icon={t.icon}>
