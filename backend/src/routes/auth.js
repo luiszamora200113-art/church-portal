@@ -41,6 +41,7 @@ router.post('/login', async (req, res) => {
         role: user.role,
         cell_id: user.cell_id,
         must_change_password: user.must_change_password,
+        can_view_finance: user.can_view_finance,
       },
     });
   } catch (err) {
@@ -52,7 +53,7 @@ router.post('/login', async (req, res) => {
 // GET /api/auth/me  -> datos del usuario autenticado
 router.get('/me', requireAuth, async (req, res) => {
   const { rows } = await pool.query(
-    'SELECT id, full_name, username, role, cell_id, phone, must_change_password FROM users WHERE id = $1',
+    'SELECT id, full_name, username, role, cell_id, phone, must_change_password, can_view_finance FROM users WHERE id = $1',
     [req.user.id]
   );
   res.json(rows[0]);
@@ -148,13 +149,13 @@ router.patch('/members/:id/reset-password', requireAuth, requireRole('admin', 's
 
 // PATCH /api/auth/members/:id (solo admin) -> editar nombre y teléfono
 router.patch('/members/:id', requireAuth, requireRole('admin', 'superadmin'), async (req, res) => {
-  const { full_name, phone } = req.body;
+  const { full_name, phone, can_view_finance } = req.body;
   if (!full_name) return res.status(400).json({ error: 'El nombre completo es requerido.' });
 
   const { rows } = await pool.query(
-    `UPDATE users SET full_name = $1, phone = $2 WHERE id = $3
-     RETURNING id, full_name, username, phone`,
-    [full_name, phone || null, req.params.id]
+    `UPDATE users SET full_name = $1, phone = $2, can_view_finance = COALESCE($3, can_view_finance) WHERE id = $4
+     RETURNING id, full_name, username, phone, can_view_finance`,
+    [full_name, phone || null, can_view_finance, req.params.id]
   );
   if (rows.length === 0) return res.status(404).json({ error: 'Miembro no encontrado.' });
   res.json(rows[0]);
