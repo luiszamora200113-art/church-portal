@@ -69,6 +69,8 @@ export default function Privileges() {
         </div>
       </div>
 
+      <div className="sched-section-divider">Lo que te toca a ti</div>
+
       {cellIsToday && (
         <div className="reminder-card today">
           <div className="reminder-icon">👥</div>
@@ -111,6 +113,14 @@ export default function Privileges() {
         </div>
         <span className="reminder-when">Este mes</span>
       </div>
+
+      {!cellIsToday && assignments.length === 0 && (
+        <p className="muted" style={{ fontSize: 13, marginTop: -4, marginBottom: 18 }}>
+          No tienes ningún privilegio asignado por ahora, aparte del diezmo de arriba.
+        </p>
+      )}
+
+      <div className="sched-section-divider">Horarios de la iglesia</div>
 
       {services.map((s) => {
         const occurDate = nextOccurrence(s.day_of_week);
