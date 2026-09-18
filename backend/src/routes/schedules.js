@@ -4,7 +4,7 @@ const { requireAuth, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 
-const VALID_TYPES = ['evento', 'culto_mensual', 'celula', 'escuela_dominical'];
+const VALID_TYPES = ['evento', 'culto_mensual', 'celula', 'escuela_dominical', 'ministerio'];
 
 async function validateType(req, res, next) {
   const type = req.body.type || req.query.type;
@@ -17,9 +17,9 @@ async function validateType(req, res, next) {
   return res.status(400).json({ error: `Tipo de programación inválido: "${type}".` });
 }
 
-// GET /api/schedules?type=evento&cell_id=1 -> lista aprobadas de un tipo (opcionalmente filtrado por célula)
+// GET /api/schedules?type=evento&cell_id=1&ministry_id=1 -> lista aprobadas de un tipo (opcionalmente filtrada)
 router.get('/', requireAuth, async (req, res) => {
-  const { type, cell_id } = req.query;
+  const { type, cell_id, ministry_id } = req.query;
   const params = [];
   let where = "s.status = 'approved'";
   if (type) {
@@ -30,6 +30,10 @@ router.get('/', requireAuth, async (req, res) => {
     params.push(cell_id);
     where += ` AND s.cell_id = $${params.length}`;
   }
+  if (ministry_id) {
+    params.push(ministry_id);
+    where += ` AND s.ministry_id = $${params.length}`;
+  }
   // Un evento ya pasado deja de ser relevante para "Eventos" — desaparece solo el día después de su fecha.
   if (type === 'evento') {
     where += ` AND (s.reference_date IS NULL OR s.reference_date >= CURRENT_DATE)`;
@@ -37,6 +41,28 @@ router.get('/', requireAuth, async (req, res) => {
   const { rows } = await pool.query(
     `SELECT s.*, u.full_name AS created_by_name
      FROM schedules s JOIN users u ON u.id = s.created_by
+     WHERE ${where} ORDER BY s.reference_date DESC NULLS LAST, s.created_at DESC`,
+    params
+  );
+  res.json(rows);
+});
+
+// GET /api/schedules/historial?type=evento -> TODAS las aprobadas de siempre, sin ocultar las pasadas (solo admin/superadmin)
+router.get('/historial', requireAuth, requireRole('admin', 'superadmin'), async (req, res) => {
+  const { type } = req.query;
+  const params = [];
+  let where = "s.status = 'approved'";
+  if (type) {
+    params.push(type);
+    where += ` AND s.type = $${params.length}`;
+  }
+  const { rows } = await pool.query(
+    `SELECT s.*, u.full_name AS created_by_name,
+       c.name AS cell_name, m.name AS ministry_name
+     FROM schedules s
+     JOIN users u ON u.id = s.created_by
+     LEFT JOIN cells c ON c.id = s.cell_id
+     LEFT JOIN ministries m ON m.id = s.ministry_id
      WHERE ${where} ORDER BY s.reference_date DESC NULLS LAST, s.created_at DESC`,
     params
   );
@@ -67,7 +93,7 @@ router.get('/:id', requireAuth, async (req, res) => {
 const RESTRICTED_TYPES = { culto_mensual: ['admin', 'superadmin', 'secretary'] };
 
 router.post('/', requireAuth, validateType, async (req, res) => {
-  const { type, title, reference_date, location, meta, rows, cell_id } = req.body;
+  const { type, title, reference_date, location, meta, rows, cell_id, ministry_id } = req.body;
   if (!title) return res.status(400).json({ error: 'El título es requerido.' });
 
   const allowedRoles = RESTRICTED_TYPES[type];
@@ -95,13 +121,25 @@ router.post('/', requireAuth, validateType, async (req, res) => {
     }
   }
 
+  // La programación de un ministerio solo la puede enviar uno de sus líderes (o admin/superadmin).
+  if (type === 'ministerio' && !['admin', 'superadmin'].includes(req.user.role)) {
+    if (!ministry_id) return res.status(400).json({ error: 'ministry_id es requerido.' });
+    const { rows: leaderRows } = await pool.query(
+      'SELECT 1 FROM ministry_leaders WHERE ministry_id = $1 AND user_id = $2',
+      [ministry_id, req.user.id]
+    );
+    if (leaderRows.length === 0) {
+      return res.status(403).json({ error: 'Solo un líder de este ministerio puede enviar su programación.' });
+    }
+  }
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const { rows: inserted } = await client.query(
-      `INSERT INTO schedules (type, title, reference_date, location, meta, cell_id, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [type, title, reference_date || null, location || null, JSON.stringify(meta || {}), cell_id || null, req.user.id]
+      `INSERT INTO schedules (type, title, reference_date, location, meta, cell_id, ministry_id, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [type, title, reference_date || null, location || null, JSON.stringify(meta || {}), cell_id || null, ministry_id || null, req.user.id]
     );
     const schedule = inserted[0];
 
@@ -178,6 +216,11 @@ router.patch('/:id/review', requireAuth, requireRole('admin', 'superadmin'), asy
       'SELECT data FROM schedule_rows WHERE schedule_id = $1',
       [schedule.id]
     );
+    let ministryName = null;
+    if (schedule.ministry_id) {
+      const { rows: mRows } = await pool.query('SELECT name FROM ministries WHERE id = $1', [schedule.ministry_id]);
+      ministryName = mRows[0]?.name || null;
+    }
     // El meta cuenta como una "fila" más para reutilizar el mismo bucle (usa la fecha general de la programación).
     const allSources = [...dataRows.map((r) => r.data), { ...(schedule.meta || {}), fecha: schedule.reference_date }];
 
@@ -203,19 +246,17 @@ router.patch('/:id/review', requireAuth, requireRole('admin', 'superadmin'), asy
           );
         }
 
-        // Campo de varios miembros (ej. "convocados_user_ids"): "Fuiste convocado a Y", uno por persona.
+        // Campo de varios miembros (ej. "convocados_user_ids" o "miembros_user_ids"): uno por persona.
         if (key.endsWith('_user_ids') && Array.isArray(value)) {
+          const notifTitle = ministryName ? `Te toca servir — ${ministryName}` : 'Fuiste convocado a una reunión';
+          const notifMessage = ministryName
+            ? `Sirves en "${ministryName}"${dateLabel ? ` el ${dateLabel}` : ''}${data.servicio ? ` — ${data.servicio}` : ''}.`
+            : `"${schedule.title}"${dateLabel ? ` el ${dateLabel}` : ''}.`;
           for (const userId of value) {
             if (!userId) continue;
             await pool.query(
               `INSERT INTO notifications (user_id, title, message, expires_at, schedule_id) VALUES ($1, $2, $3, $4, $5)`,
-              [
-                userId,
-                'Fuiste convocado a una reunión',
-                `"${schedule.title}"${dateLabel ? ` el ${dateLabel}` : ''}.`,
-                data.fecha || null,
-                schedule.id,
-              ]
+              [userId, notifTitle, notifMessage, data.fecha || null, schedule.id]
             );
           }
         }
@@ -229,13 +270,15 @@ router.patch('/:id/review', requireAuth, requireRole('admin', 'superadmin'), asy
 // GET /api/schedules/assignments/mine -> privilegios asignados a mí en programaciones aprobadas (solo próximos, no pasados)
 router.get('/assignments/mine', requireAuth, async (req, res) => {
   const { rows: approved } = await pool.query(
-    `SELECT id, title, reference_date, meta FROM schedules WHERE status = 'approved'`
+    `SELECT id, title, reference_date, meta, type, ministry_id FROM schedules WHERE status = 'approved'`
   );
   const { rows: rowData } = await pool.query(
-    `SELECT sr.schedule_id, sr.data, s.title
+    `SELECT sr.schedule_id, sr.data, s.title, s.ministry_id
      FROM schedule_rows sr JOIN schedules s ON s.id = sr.schedule_id
      WHERE s.status = 'approved'`
   );
+  const { rows: ministryRows } = await pool.query('SELECT id, name FROM ministries');
+  const ministryName = (id) => ministryRows.find((m) => m.id === id)?.name || null;
 
   const today = new Date().toISOString().slice(0, 10);
   const assignments = [];
@@ -262,7 +305,7 @@ router.get('/assignments/mine', requireAuth, async (req, res) => {
           schedule_id: row.schedule_id,
           schedule_title: row.title,
           field: baseField,
-          label: 'Convocatoria',
+          label: ministryName(row.ministry_id) || 'Convocatoria',
           fecha: row.data.fecha || null,
           completed: false,
         });
@@ -292,7 +335,7 @@ router.get('/assignments/mine', requireAuth, async (req, res) => {
           schedule_id: sched.id,
           schedule_title: sched.title,
           field: baseField,
-          label: 'Convocatoria',
+          label: ministryName(sched.ministry_id) || 'Convocatoria',
           fecha,
           completed: false,
         });
@@ -308,15 +351,17 @@ router.get('/assignments/mine', requireAuth, async (req, res) => {
 // para poder marcar quién cumplió su privilegio.
 router.get('/assignments/all', requireAuth, requireRole('admin', 'superadmin'), async (req, res) => {
   const { rows: approved } = await pool.query(
-    `SELECT id, title, reference_date, meta FROM schedules WHERE status = 'approved'`
+    `SELECT id, title, reference_date, meta, type, ministry_id FROM schedules WHERE status = 'approved'`
   );
   const { rows: rowData } = await pool.query(
-    `SELECT sr.id AS row_id, sr.schedule_id, sr.data, s.title
+    `SELECT sr.id AS row_id, sr.schedule_id, sr.data, s.title, s.ministry_id
      FROM schedule_rows sr JOIN schedules s ON s.id = sr.schedule_id
      WHERE s.status = 'approved'`
   );
   const { rows: users } = await pool.query('SELECT id, full_name FROM users');
   const nameOf = (id) => users.find((u) => u.id === Number(id))?.full_name || `#${id}`;
+  const { rows: ministryRows } = await pool.query('SELECT id, name FROM ministries');
+  const ministryName = (id) => ministryRows.find((m) => m.id === id)?.name || null;
 
   const assignments = [];
 
@@ -344,7 +389,7 @@ router.get('/assignments/all', requireAuth, requireRole('admin', 'superadmin'), 
             row_id: row.row_id,
             schedule_title: row.title,
             field: baseField,
-            label: 'Convocatoria',
+            label: ministryName(row.ministry_id) || 'Convocatoria',
             fecha: row.data.fecha || null,
             user_id: Number(uid),
             user_name: nameOf(uid),
@@ -380,7 +425,7 @@ router.get('/assignments/all', requireAuth, requireRole('admin', 'superadmin'), 
             row_id: null,
             schedule_title: sched.title,
             field: baseField,
-            label: 'Convocatoria',
+            label: ministryName(sched.ministry_id) || 'Convocatoria',
             fecha,
             user_id: Number(uid),
             user_name: nameOf(uid),
