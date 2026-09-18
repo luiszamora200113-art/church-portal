@@ -12,6 +12,8 @@ import AdminCells from './pages/admin/AdminCells.jsx';
 import AdminTemplates from './pages/admin/AdminTemplates.jsx';
 import AdminChurchInfo from './pages/admin/AdminChurchInfo.jsx';
 import AdminServices from './pages/admin/AdminServices.jsx';
+import AdminMinistries from './pages/admin/AdminMinistries.jsx';
+import AdminHistorial from './pages/admin/AdminHistorial.jsx';
 import AboutChurch from './pages/AboutChurch.jsx';
 import AdminFinance from './pages/admin/AdminFinance.jsx';
 import AdminDuties from './pages/admin/AdminDuties.jsx';
@@ -81,7 +83,9 @@ function Nav() {
         <Link className={linkClass('/conocenos')} to="/conocenos">Conócenos</Link>
         <Link className={linkClass('/deberes')} to="/deberes">Mis privilegios</Link>
         <Link className={linkClass('/mi-celula')} to="/mi-celula">Mi célula</Link>
-        <Link className={linkClass('/finanzas')} to="/finanzas">Finanzas</Link>
+        {(['admin', 'superadmin', 'finance'].includes(user.role) || user.can_view_finance) && (
+          <Link className={linkClass('/finanzas')} to="/finanzas">Finanzas</Link>
+        )}
         <Link className={linkClass('/eventos')} to="/eventos">Eventos</Link>
         <Link className={linkClass('/programacion')} to="/programacion">Programación</Link>
         {['admin', 'superadmin', 'secretary'].includes(user.role) && (
@@ -189,6 +193,8 @@ export default function App() {
           <Route path="plantillas" element={<AdminTemplates />} />
           <Route path="conocenos" element={<AdminChurchInfo />} />
           <Route path="servicios" element={<AdminServices />} />
+          <Route path="ministerios" element={<AdminMinistries />} />
+          <Route path="historial" element={<AdminHistorial />} />
           <Route path="finanzas" element={<AdminFinance />} />
           <Route path="deberes" element={<AdminDuties />} />
           <Route path="documentos" element={<AdminDocuments />} />
