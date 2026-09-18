@@ -101,6 +101,15 @@ export default function CreateMember() {
     setResetInfo({ id, temp_password: data.temp_password });
   }
 
+  async function toggleFinanceAccess(m) {
+    await fetch(`${API_URL}/api/auth/members/${m.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ full_name: m.full_name, phone: m.phone, can_view_finance: !m.can_view_finance }),
+    });
+    loadMembers();
+  }
+
   async function toggleActive(id) {
     await fetch(`${API_URL}/api/auth/members/${id}/toggle-active`, {
       method: 'PATCH',
@@ -202,6 +211,13 @@ export default function CreateMember() {
                   ))}
                 </select>
                 <button className="btn-outline" style={{ fontSize: 12, padding: '5px 10px' }} onClick={() => startEdit(m)}>Editar</button>
+                <button
+                  className="btn-outline"
+                  style={{ fontSize: 12, padding: '5px 10px', color: m.can_view_finance ? 'var(--moss-dark)' : undefined, borderColor: m.can_view_finance ? 'var(--moss-dark)' : undefined }}
+                  onClick={() => toggleFinanceAccess(m)}
+                >
+                  {m.can_view_finance ? '💰 Finanzas ✓' : '💰 Ver finanzas'}
+                </button>
                 <button className="btn-outline" style={{ fontSize: 12, padding: '5px 10px' }} onClick={() => resetPassword(m.id)}>Restablecer clave</button>
                 <button className="btn-outline" style={{ fontSize: 12, padding: '5px 10px' }} onClick={() => toggleActive(m.id)}>
                   {m.is_active ? 'Desactivar' : 'Activar'}
