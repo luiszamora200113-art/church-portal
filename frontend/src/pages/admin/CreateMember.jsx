@@ -118,6 +118,20 @@ export default function CreateMember() {
     loadMembers();
   }
 
+  async function deleteMember(m) {
+    if (!window.confirm(`¿Eliminar por completo a ${m.full_name}? Esta acción no se puede deshacer.`)) return;
+    const res = await fetch(`${API_URL}/api/auth/members/${m.id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert(data.error || 'No se pudo eliminar.');
+      return;
+    }
+    loadMembers();
+  }
+
   return (
     <div>
       <h1>Crear credenciales de miembro</h1>
@@ -193,7 +207,7 @@ export default function CreateMember() {
                     {m.full_name}
                     {m.role !== 'member' && (
                       <span className="muted" style={{ fontSize: 11, marginLeft: 6 }}>
-                        ({m.role === 'finance' ? 'Finanzas' : m.role === 'secretary' ? 'Secretaría' : 'Educación'})
+                        ({m.role === 'finance' ? 'Finanzas' : m.role === 'secretary' ? 'Secretaría' : m.role === 'education' ? 'Educación' : m.role === 'admin' ? 'Admin' : m.role === 'superadmin' ? 'Superadmin' : m.role})
                       </span>
                     )}
                     {!m.is_active && <span className="muted" style={{ fontSize: 11, marginLeft: 6 }}>(Desactivado)</span>}
@@ -221,6 +235,9 @@ export default function CreateMember() {
                 <button className="btn-outline" style={{ fontSize: 12, padding: '5px 10px' }} onClick={() => resetPassword(m.id)}>Restablecer clave</button>
                 <button className="btn-outline" style={{ fontSize: 12, padding: '5px 10px' }} onClick={() => toggleActive(m.id)}>
                   {m.is_active ? 'Desactivar' : 'Activar'}
+                </button>
+                <button className="btn-outline" style={{ fontSize: 12, padding: '5px 10px', color: '#b23b3b', borderColor: '#b23b3b' }} onClick={() => deleteMember(m)}>
+                  Eliminar
                 </button>
               </div>
             )}
