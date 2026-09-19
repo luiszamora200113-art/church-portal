@@ -195,6 +195,7 @@ CREATE TABLE IF NOT EXISTS ministries (
   name VARCHAR(150) UNIQUE NOT NULL,
   description VARCHAR(255),
   icon VARCHAR(10) NOT NULL DEFAULT '🙏',
+  row_fields JSONB NOT NULL DEFAULT '[{"key":"fecha","label":"Fecha","type":"fecha"},{"key":"servicio","label":"Servicio","type":"texto"},{"key":"miembros","label":"Sirven","type":"miembros"},{"key":"notas","label":"Notas","type":"texto"}]',
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
@@ -254,6 +255,7 @@ CREATE TABLE IF NOT EXISTS notifications (
 const ALTER_STATEMENTS = [
   `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP;`,
   `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS schedule_id INTEGER REFERENCES schedules(id) ON DELETE CASCADE;`,
+  `ALTER TABLE ministries ADD COLUMN IF NOT EXISTS row_fields JSONB NOT NULL DEFAULT '[{"key":"fecha","label":"Fecha","type":"fecha"},{"key":"servicio","label":"Servicio","type":"texto"},{"key":"miembros","label":"Sirven","type":"miembros"},{"key":"notas","label":"Notas","type":"texto"}]';`,
 ];
 
 async function migrate() {
