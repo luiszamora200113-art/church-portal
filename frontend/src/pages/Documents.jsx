@@ -171,7 +171,23 @@ function CustomTemplateForm({ template, roster, token, API_URL }) {
 }
 
 function MinistryScheduleForm({ ministry, roster, token, API_URL }) {
-  const emptyRow = () => ({ fecha: '', servicio: '', miembros: '', miembros_user_ids: [], notas: '' });
+  const fields = ministry.row_fields && ministry.row_fields.length > 0
+    ? ministry.row_fields
+    : [
+        { key: 'fecha', label: 'Fecha', type: 'fecha' },
+        { key: 'servicio', label: 'Servicio', type: 'texto' },
+        { key: 'miembros', label: 'Sirven', type: 'miembros' },
+        { key: 'notas', label: 'Notas', type: 'texto' },
+      ];
+
+  const emptyRow = () => Object.fromEntries(
+    fields.flatMap((f) => {
+      if (f.type === 'miembro') return [[f.key, ''], [`${f.key}_user_id`, '']];
+      if (f.type === 'miembros') return [[f.key, ''], [`${f.key}_user_ids`, []]];
+      return [[f.key, '']];
+    })
+  );
+
   const [form, setForm] = useState({ title: '', reference_date: '' });
   const [rows, setRows] = useState([emptyRow(), emptyRow()]);
   const [msg, setMsg] = useState('');
@@ -182,13 +198,20 @@ function MinistryScheduleForm({ ministry, roster, token, API_URL }) {
     setRows(copy);
   }
 
-  function toggleRowMember(idx, memberId) {
+  function updateRowMember(idx, f, memberId) {
+    const m = roster.find((r) => r.id === Number(memberId));
+    const copy = [...rows];
+    copy[idx] = { ...copy[idx], [f.key]: m ? m.full_name : '', [`${f.key}_user_id`]: memberId };
+    setRows(copy);
+  }
+
+  function toggleRowMembers(idx, f, memberId) {
     setRows((r) => {
       const copy = [...r];
-      const current = copy[idx].miembros_user_ids || [];
+      const current = copy[idx][`${f.key}_user_ids`] || [];
       const next = current.includes(memberId) ? current.filter((id) => id !== memberId) : [...current, memberId];
       const names = roster.filter((m) => next.includes(m.id)).map((m) => m.full_name).join(', ');
-      copy[idx] = { ...copy[idx], miembros: names, miembros_user_ids: next };
+      copy[idx] = { ...copy[idx], [f.key]: names, [`${f.key}_user_ids`]: next };
       return copy;
     });
   }
@@ -213,39 +236,52 @@ function MinistryScheduleForm({ ministry, roster, token, API_URL }) {
 
   return (
     <>
-      <label>Título (ej. Programa Ujieres — Octubre 2026)</label>
+      <label>Título (ej. Programa {ministry.name} — Octubre 2026)</label>
       <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
       <label>Mes que cubre</label>
       <input type="date" value={form.reference_date} onChange={(e) => setForm((f) => ({ ...f, reference_date: e.target.value }))} />
 
-      <label style={{ marginTop: 14 }}>Quién sirve cada fecha</label>
+      <label style={{ marginTop: 14 }}>Programación</label>
       <table className="sched-table" style={{ marginTop: 6 }}>
-        <thead><tr><th>Fecha</th><th>Servicio</th><th>Sirven</th><th>Notas</th></tr></thead>
+        <thead><tr>{fields.map((f) => <th key={f.key}>{f.label}</th>)}</tr></thead>
         <tbody>
           {rows.map((row, i) => (
             <tr key={i}>
-              <td><input type="date" value={row.fecha} onChange={(e) => updateRow(i, 'fecha', e.target.value)} style={{ border: 'none', background: 'transparent', padding: 0 }} /></td>
-              <td><input value={row.servicio} onChange={(e) => updateRow(i, 'servicio', e.target.value)} placeholder="Culto dominical mañana" style={{ border: 'none', background: 'transparent', padding: 0 }} /></td>
-              <td>
-                <details>
-                  <summary style={{ cursor: 'pointer', fontSize: 13 }}>{row.miembros || 'Elegir…'}</summary>
-                  <div style={{ maxHeight: 160, overflowY: 'auto', border: '1px solid var(--line)', borderRadius: 8, padding: 8, marginTop: 4, background: 'var(--card)' }}>
-                    {roster.map((m) => (
-                      <label key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, padding: '3px 0' }}>
-                        <input type="checkbox" checked={(row.miembros_user_ids || []).includes(m.id)} onChange={() => toggleRowMember(i, m.id)} />
-                        {m.full_name}
-                      </label>
-                    ))}
-                  </div>
-                </details>
-              </td>
-              <td><input value={row.notas} onChange={(e) => updateRow(i, 'notas', e.target.value)} style={{ border: 'none', background: 'transparent', padding: 0 }} /></td>
+              {fields.map((f) => (
+                <td key={f.key}>
+                  {f.type === 'fecha' && (
+                    <input type="date" value={row[f.key] || ''} onChange={(e) => updateRow(i, f.key, e.target.value)} style={{ border: 'none', background: 'transparent', padding: 0 }} />
+                  )}
+                  {f.type === 'texto' && (
+                    <input value={row[f.key] || ''} onChange={(e) => updateRow(i, f.key, e.target.value)} style={{ border: 'none', background: 'transparent', padding: 0 }} />
+                  )}
+                  {f.type === 'miembro' && (
+                    <select value={row[`${f.key}_user_id`] || ''} onChange={(e) => updateRowMember(i, f, e.target.value)} style={{ border: 'none', background: 'transparent', padding: 0, fontSize: 13 }}>
+                      <option value="">Elegir…</option>
+                      {roster.map((m) => <option key={m.id} value={m.id}>{m.full_name}</option>)}
+                    </select>
+                  )}
+                  {f.type === 'miembros' && (
+                    <details>
+                      <summary style={{ cursor: 'pointer', fontSize: 13 }}>{row[f.key] || 'Elegir…'}</summary>
+                      <div style={{ maxHeight: 160, overflowY: 'auto', border: '1px solid var(--line)', borderRadius: 8, padding: 8, marginTop: 4, background: 'var(--card)' }}>
+                        {roster.map((m) => (
+                          <label key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, padding: '3px 0' }}>
+                            <input type="checkbox" checked={(row[`${f.key}_user_ids`] || []).includes(m.id)} onChange={() => toggleRowMembers(i, f, m.id)} />
+                            {m.full_name}
+                          </label>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                </td>
+              ))}
             </tr>
           ))}
         </tbody>
       </table>
       <button className="btn-outline" style={{ marginTop: 8, fontSize: 12 }} onClick={() => setRows((r) => [...r, emptyRow()])}>
-        + Agregar fecha
+        + Agregar fila
       </button>
       <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
         Al aprobarse, cada persona que elijas recibe notificación y le aparece en su "Mis privilegios".
