@@ -82,23 +82,31 @@ function drawTable(doc, columns, rows, { startY } = {}) {
   const width = 512;
   const padding = 10;
   let y = startY || doc.y + 10;
-  const rowHeight = 24;
+  const headerHeight = 24;
+  const lineHeight = 13; // alto aproximado de una línea de texto a 10pt
+  const minRowHeight = 24;
 
   // Encabezado
-  doc.rect(left, y, width, rowHeight).fill(MOSS);
+  doc.rect(left, y, width, headerHeight).fill(MOSS);
   doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(10);
   let x = left + padding;
   columns.forEach((col) => {
     doc.text(col.label, x, y + 7, { width: col.width - padding, align: col.align || 'left' });
     x += col.width;
   });
-  y += rowHeight;
+  y += headerHeight;
 
-  // Filas
+  // Filas — la altura se calcula según la celda con más texto, para que nada se encime.
+  doc.font('Helvetica').fontSize(10);
   rows.forEach((row, idx) => {
-    if (y > doc.page.height - 100) {
+    const rowHeight = Math.max(
+      minRowHeight,
+      ...columns.map((col) => doc.heightOfString(String(row[col.key] ?? ''), { width: col.width - padding }) + 14)
+    );
+
+    if (y + rowHeight > doc.page.height - 80) {
       doc.addPage();
-      y = doc.y;
+      y = 50;
     }
     if (idx % 2 === 0) {
       doc.rect(left, y, width, rowHeight).fill('#f6f4ee');
@@ -294,6 +302,13 @@ router.get('/programacion/:id.pdf', requireAuth, async (req, res) => {
     customTemplate = tRows[0] || null;
   }
 
+  // Para 'ministerio', las columnas las define cada ministerio (row_fields propio), no una lista fija.
+  let ministryRowFields = null;
+  if (schedule.type === 'ministerio' && schedule.ministry_id) {
+    const { rows: minRows } = await pool.query('SELECT row_fields FROM ministries WHERE id = $1', [schedule.ministry_id]);
+    ministryRowFields = minRows[0]?.row_fields || null;
+  }
+
   const dateLabel = schedule.reference_date
     ? new Date(schedule.reference_date).toLocaleDateString('es-NI', { day: '2-digit', month: 'long', year: 'numeric' })
     : '';
@@ -322,8 +337,10 @@ router.get('/programacion/:id.pdf', requireAuth, async (req, res) => {
     doc.moveDown(0.5);
   }
 
-  const columns = SCHEDULE_COLUMNS[schedule.type] ||
-    (customTemplate?.row_fields || []).map((f) => ({ key: f.key, label: f.label, width: Math.floor(512 / Math.max(customTemplate.row_fields.length, 1)) }));
+  const columns = ministryRowFields
+    ? ministryRowFields.map((f) => ({ key: f.key, label: f.label, width: Math.floor(512 / Math.max(ministryRowFields.length, 1)) }))
+    : SCHEDULE_COLUMNS[schedule.type] ||
+      (customTemplate?.row_fields || []).map((f) => ({ key: f.key, label: f.label, width: Math.floor(512 / Math.max(customTemplate.row_fields.length, 1)) }));
   if (dataRows.length > 0 && columns.length > 0) {
     drawTable(doc, columns, dataRows.map((r) => r.data));
   }
