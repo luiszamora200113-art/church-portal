@@ -3,6 +3,14 @@ const pool = require('../config/db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
+const VALID_FIELD_TYPES = ['texto', 'fecha', 'miembro', 'miembros'];
+
+function validateRowFields(fields) {
+  if (!Array.isArray(fields)) return false;
+  return fields.every(
+    (f) => f && typeof f.key === 'string' && typeof f.label === 'string' && VALID_FIELD_TYPES.includes(f.type)
+  );
+}
 
 // GET /api/ministries -> lista completa con sus líderes (cualquier miembro autenticado)
 router.get('/', requireAuth, async (req, res) => {
@@ -30,14 +38,19 @@ router.get('/mine', requireAuth, async (req, res) => {
   res.json(rows);
 });
 
-// POST /api/ministries -> crear un ministerio nuevo (admin/superadmin)
+// POST /api/ministries -> crear un ministerio nuevo, con sus columnas propias (admin/superadmin)
 router.post('/', requireAuth, requireRole('admin', 'superadmin'), async (req, res) => {
-  const { name, description, icon } = req.body;
+  const { name, description, icon, row_fields } = req.body;
   if (!name || !name.trim()) return res.status(400).json({ error: 'El nombre es requerido.' });
+  if (row_fields && !validateRowFields(row_fields)) return res.status(400).json({ error: 'Columnas inválidas.' });
   try {
     const { rows } = await pool.query(
-      `INSERT INTO ministries (name, description, icon) VALUES ($1, $2, $3) RETURNING *`,
-      [name.trim(), description || null, icon || '🙏']
+      row_fields
+        ? `INSERT INTO ministries (name, description, icon, row_fields) VALUES ($1, $2, $3, $4) RETURNING *`
+        : `INSERT INTO ministries (name, description, icon) VALUES ($1, $2, $3) RETURNING *`,
+      row_fields
+        ? [name.trim(), description || null, icon || '🙏', JSON.stringify(row_fields)]
+        : [name.trim(), description || null, icon || '🙏']
     );
     res.status(201).json(rows[0]);
   } catch (err) {
@@ -47,12 +60,13 @@ router.post('/', requireAuth, requireRole('admin', 'superadmin'), async (req, re
   }
 });
 
-// PUT /api/ministries/:id -> editar nombre/descripción/ícono (admin/superadmin)
+// PUT /api/ministries/:id -> editar nombre/descripción/ícono/columnas (admin/superadmin)
 router.put('/:id', requireAuth, requireRole('admin', 'superadmin'), async (req, res) => {
-  const { name, description, icon } = req.body;
+  const { name, description, icon, row_fields } = req.body;
+  if (row_fields && !validateRowFields(row_fields)) return res.status(400).json({ error: 'Columnas inválidas.' });
   const { rows } = await pool.query(
-    `UPDATE ministries SET name=$1, description=$2, icon=$3 WHERE id=$4 RETURNING *`,
-    [name, description || null, icon || '🙏', req.params.id]
+    `UPDATE ministries SET name=$1, description=$2, icon=$3, row_fields=COALESCE($4, row_fields) WHERE id=$5 RETURNING *`,
+    [name, description || null, icon || '🙏', row_fields ? JSON.stringify(row_fields) : null, req.params.id]
   );
   if (rows.length === 0) return res.status(404).json({ error: 'No encontrado.' });
   res.json(rows[0]);
