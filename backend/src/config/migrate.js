@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS finance_entries (
   category_id INTEGER NOT NULL REFERENCES finance_categories(id) ON DELETE RESTRICT,
   amount NUMERIC(12,2) NOT NULL,
   entry_month DATE NOT NULL,          -- primer día del mes al que corresponde, ej. 2026-08-01
+  entry_type VARCHAR(10) NOT NULL DEFAULT 'ingreso', -- 'ingreso' | 'egreso'
   note VARCHAR(255),
   registered_by INTEGER NOT NULL REFERENCES users(id),
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
@@ -256,6 +257,7 @@ const ALTER_STATEMENTS = [
   `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP;`,
   `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS schedule_id INTEGER REFERENCES schedules(id) ON DELETE CASCADE;`,
   `ALTER TABLE ministries ADD COLUMN IF NOT EXISTS row_fields JSONB NOT NULL DEFAULT '[{"key":"fecha","label":"Fecha","type":"fecha"},{"key":"servicio","label":"Servicio","type":"texto"},{"key":"miembros","label":"Sirven","type":"miembros"},{"key":"notas","label":"Notas","type":"texto"}]';`,
+  `ALTER TABLE finance_entries ADD COLUMN IF NOT EXISTS entry_type VARCHAR(10) NOT NULL DEFAULT 'ingreso';`,
 ];
 
 async function migrate() {
