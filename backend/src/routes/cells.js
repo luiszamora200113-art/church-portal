@@ -26,7 +26,7 @@ router.get('/mine', requireAuth, async (req, res) => {
   }
 
   const { rows: cellRows } = await pool.query(
-    `SELECT c.*, u.full_name AS leader_name
+    `SELECT c.*, u.full_name AS leader_name, u.phone AS leader_phone
      FROM cells c LEFT JOIN users u ON u.id = c.leader_id
      WHERE c.id = $1`,
     [cellId]
@@ -56,7 +56,7 @@ router.post('/', requireAuth, requireRole('admin', 'superadmin'), async (req, re
 // Accesible a cualquier miembro autenticado (no expone teléfono, célula ni rol).
 router.get('/roster', requireAuth, async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT id, full_name FROM users WHERE is_active = true ORDER BY full_name`
+    `SELECT id, full_name FROM users WHERE is_active = true AND role != 'superadmin' ORDER BY full_name`
   );
   res.json(rows);
 });
@@ -67,7 +67,7 @@ router.get('/members-overview', requireAuth, requireRole('admin', 'superadmin', 
     SELECT u.id, u.full_name, u.phone, u.is_active, u.role, u.cell_id, u.can_view_finance, c.name AS cell_name
     FROM users u
     LEFT JOIN cells c ON c.id = u.cell_id
-    WHERE u.role IN ('member', 'finance', 'secretary', 'education', 'admin', 'superadmin')
+    WHERE u.role IN ('member', 'finance', 'secretary', 'education', 'admin')
     ORDER BY u.full_name
   `);
   res.json(rows);
