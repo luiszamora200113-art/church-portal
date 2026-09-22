@@ -125,33 +125,92 @@ function drawTable(doc, columns, rows, { startY } = {}) {
 }
 
 // GET /api/reports/finanzas.pdf -> desglose de finanzas del mes en curso (admin/tesorero)
+// GET /api/reports/finanzas.pdf?from=2026-08-01&to=2026-09-30 -> reporte flexible (mes, varios meses, o año)
 router.get('/finanzas.pdf', requireAuth, requireRole('admin', 'superadmin', 'finance'), async (req, res) => {
-  const { rows } = await pool.query(`
-    SELECT fc.name, COALESCE(SUM(fe.amount), 0) AS total
-    FROM finance_categories fc
-    LEFT JOIN finance_entries fe
-      ON fe.category_id = fc.id
-      AND date_trunc('month', fe.entry_month) = date_trunc('month', CURRENT_DATE)
-    GROUP BY fc.name
-    ORDER BY fc.name
-  `);
+  let { from, to } = req.query;
+  if (!from || !to) {
+    from = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+    to = from;
+  }
 
-  const { doc, finish } = createLetterheadPdf(res, 'reporte-finanzas.pdf', 'Reporte de Finanzas', monthLabel());
+  const { rows: totals } = await pool.query(
+    `SELECT
+       COALESCE(SUM(amount) FILTER (WHERE entry_type = 'ingreso'), 0) AS ingresos,
+       COALESCE(SUM(amount) FILTER (WHERE entry_type = 'egreso'), 0) AS egresos
+     FROM finance_entries WHERE entry_month >= $1 AND entry_month <= $2`,
+    [from, to]
+  );
+  const { rows: byCategory } = await pool.query(
+    `SELECT fc.name,
+       COALESCE(SUM(fe.amount) FILTER (WHERE fe.entry_type = 'ingreso'), 0) AS ingresos,
+       COALESCE(SUM(fe.amount) FILTER (WHERE fe.entry_type = 'egreso'), 0) AS egresos
+     FROM finance_categories fc
+     LEFT JOIN finance_entries fe ON fe.category_id = fc.id AND fe.entry_month >= $1 AND fe.entry_month <= $2
+     GROUP BY fc.name
+     HAVING COALESCE(SUM(fe.amount), 0) > 0
+     ORDER BY fc.name`,
+    [from, to]
+  );
+  const { rows: byMonth } = await pool.query(
+    `SELECT to_char(entry_month, 'TMMonth YYYY') AS month_label, entry_month,
+       COALESCE(SUM(amount) FILTER (WHERE entry_type = 'ingreso'), 0) AS ingresos,
+       COALESCE(SUM(amount) FILTER (WHERE entry_type = 'egreso'), 0) AS egresos
+     FROM finance_entries WHERE entry_month >= $1 AND entry_month <= $2
+     GROUP BY entry_month ORDER BY entry_month`,
+    [from, to]
+  );
 
-  const total = rows.reduce((acc, r) => acc + Number(r.total), 0);
+  const fromDate = new Date(from);
+  const toDate = new Date(to);
+  const rangeLabel = fromDate.getTime() === toDate.getTime()
+    ? fromDate.toLocaleDateString('es-NI', { month: 'long', year: 'numeric' })
+    : `${fromDate.toLocaleDateString('es-NI', { month: 'long', year: 'numeric' })} — ${toDate.toLocaleDateString('es-NI', { month: 'long', year: 'numeric' })}`;
 
+  const { doc, finish } = createLetterheadPdf(res, 'reporte-finanzas.pdf', 'Reporte de Finanzas', rangeLabel);
+
+  const ingresos = Number(totals[0].ingresos);
+  const egresos = Number(totals[0].egresos);
+
+  // Si el rango cubre más de un mes, primero un resumen por mes.
+  if (byMonth.length > 1) {
+    doc.font('Helvetica-Bold').fontSize(12).fillColor(MOSS_DARK).text('Resumen por mes', 50, doc.y);
+    doc.moveDown(0.3);
+    drawTable(
+      doc,
+      [
+        { key: 'month_label', label: 'Mes', width: 200 },
+        { key: 'ingresos', label: 'Ingresos', width: 156, align: 'right' },
+        { key: 'egresos', label: 'Egresos', width: 156, align: 'right' },
+      ],
+      byMonth.map((r) => ({ month_label: r.month_label.trim(), ingresos: money(r.ingresos), egresos: money(r.egresos) }))
+    );
+    doc.moveDown(0.5);
+  }
+
+  doc.font('Helvetica-Bold').fontSize(12).fillColor(MOSS_DARK).text('Desglose por categoría', 50, doc.y);
+  doc.moveDown(0.3);
   drawTable(
     doc,
     [
-      { key: 'name', label: 'Categoría', width: 340 },
-      { key: 'total', label: 'Monto', width: 172, align: 'right' },
+      { key: 'name', label: 'Categoría', width: 200 },
+      { key: 'ingresos', label: 'Ingresos', width: 156, align: 'right' },
+      { key: 'egresos', label: 'Egresos', width: 156, align: 'right' },
     ],
-    rows.map((r) => ({ name: r.name, total: money(r.total) }))
+    byCategory.length > 0
+      ? byCategory.map((r) => ({ name: r.name, ingresos: money(r.ingresos), egresos: money(r.egresos) }))
+      : [{ name: 'Sin movimientos en este rango', ingresos: money(0), egresos: money(0) }]
   );
 
-  doc.font('Helvetica-Bold').fontSize(12).fillColor(MOSS_DARK)
-    .text('Total del mes:', 50, doc.y, { continued: true, width: 330 })
-    .text(money(total), { align: 'right' });
+  doc.moveDown(0.3);
+  doc.font('Helvetica-Bold').fontSize(11).fillColor(MOSS_DARK)
+    .text('Total ingresos:', 50, doc.y, { continued: true, width: 330 })
+    .fillColor('#2f6b3a').text(money(ingresos), { align: 'right' });
+  doc.font('Helvetica-Bold').fontSize(11).fillColor(MOSS_DARK)
+    .text('Total egresos:', 50, doc.y, { continued: true, width: 330 })
+    .fillColor('#b23b3b').text(money(egresos), { align: 'right' });
+  doc.font('Helvetica-Bold').fontSize(13).fillColor(MOSS_DARK)
+    .text('Balance:', 50, doc.y, { continued: true, width: 330 })
+    .text(money(ingresos - egresos), { align: 'right' });
 
   finish();
 });
