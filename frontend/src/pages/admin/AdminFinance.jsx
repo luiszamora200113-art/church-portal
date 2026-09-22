@@ -10,7 +10,7 @@ export default function AdminFinance() {
   const [breakdown, setBreakdown] = useState([]);
   const [viewMonth, setViewMonth] = useState(todayMonth());
   const [entries, setEntries] = useState([]);
-  const [form, setForm] = useState({ category_id: '', amount: '', entry_month: todayMonth(), note: '' });
+  const [form, setForm] = useState({ category_id: '', amount: '', entry_month: todayMonth(), entry_type: 'ingreso', note: '' });
   const [newCatName, setNewCatName] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -49,8 +49,8 @@ export default function AdminFinance() {
     });
     const data = await res.json();
     if (!res.ok) return setError(data.error || 'No se pudo registrar el monto.');
-    setMessage('Monto registrado correctamente.');
-    setForm({ category_id: '', amount: '', entry_month: todayMonth(), note: '' });
+    setMessage(`${form.entry_type === 'egreso' ? 'Egreso' : 'Ingreso'} registrado correctamente.`);
+    setForm({ category_id: '', amount: '', entry_month: todayMonth(), entry_type: 'ingreso', note: '' });
     loadAll();
   }
 
@@ -72,6 +72,7 @@ export default function AdminFinance() {
       category_id: entry.category_id,
       amount: entry.amount,
       entry_month: entry.entry_month.slice(0, 10),
+      entry_type: entry.entry_type,
       note: entry.note || '',
     });
   }
@@ -95,13 +96,28 @@ export default function AdminFinance() {
     loadAll();
   }
 
+  const totalIngresos = breakdown.reduce((acc, c) => acc + c.ingresos, 0);
+  const totalEgresos = breakdown.reduce((acc, c) => acc + c.egresos, 0);
+
   return (
     <div>
       <h1>Finanzas — Administración</h1>
 
       <div className="card">
-        <h2>Registrar un monto</h2>
+        <h2>Registrar un movimiento</h2>
         <form onSubmit={handleAddEntry} style={{ maxWidth: 480 }}>
+          <label>Tipo</label>
+          <div style={{ display: 'flex', gap: 14, marginBottom: 4 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
+              <input type="radio" name="entry_type" checked={form.entry_type === 'ingreso'} onChange={() => setForm((f) => ({ ...f, entry_type: 'ingreso' }))} />
+              💚 Ingreso
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
+              <input type="radio" name="entry_type" checked={form.entry_type === 'egreso'} onChange={() => setForm((f) => ({ ...f, entry_type: 'egreso' }))} />
+              🔴 Egreso
+            </label>
+          </div>
+
           <label>Categoría</label>
           <select value={form.category_id} onChange={(e) => setForm((f) => ({ ...f, category_id: e.target.value }))}>
             <option value="">Selecciona una categoría</option>
@@ -115,7 +131,7 @@ export default function AdminFinance() {
           <input type="date" value={form.entry_month} onChange={(e) => setForm((f) => ({ ...f, entry_month: e.target.value }))} />
 
           <label>Nota (opcional)</label>
-          <input value={form.note} onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))} />
+          <input value={form.note} onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))} placeholder={form.entry_type === 'egreso' ? 'Ej. Pago de energía eléctrica' : ''} />
 
           {error && <p className="error">{error}</p>}
           {message && <p className="success">{message}</p>}
@@ -143,14 +159,22 @@ export default function AdminFinance() {
           </div>
         </div>
         <ul className="fin-breakdown">
-          {breakdown.map((c) => (
+          {breakdown.filter((c) => c.ingresos > 0 || c.egresos > 0).map((c) => (
             <li key={c.id}>
               <span className="cat"><span className="swatch" style={{ background: c.color }}></span>{c.name}</span>
-              <span className="amt">{money(c.total)}</span>
+              <span className="amt">
+                {c.ingresos > 0 && <span style={{ color: '#2f6b3a' }}>+{money(c.ingresos)}</span>}
+                {c.ingresos > 0 && c.egresos > 0 && '  ·  '}
+                {c.egresos > 0 && <span style={{ color: '#b23b3b' }}>-{money(c.egresos)}</span>}
+              </span>
             </li>
           ))}
         </ul>
-        <form onSubmit={handleAddCategory} className="new-cat-row">
+        <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 10, marginTop: 6, borderTop: '1px solid var(--line)', fontWeight: 600 }}>
+          <span>Balance del mes</span>
+          <span>{money(totalIngresos - totalEgresos)}</span>
+        </div>
+        <form onSubmit={handleAddCategory} className="new-cat-row" style={{ marginTop: 16 }}>
           <input placeholder="Nueva categoría" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} />
           <button className="primary" style={{ marginTop: 0, width: 'auto', padding: '0 16px' }} type="submit">Crear</button>
         </form>
@@ -167,6 +191,16 @@ export default function AdminFinance() {
           <div key={entry.id} style={{ borderBottom: '1px solid var(--line)', padding: '10px 0' }}>
             {editingId === entry.id ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 14 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 400, textTransform: 'none' }}>
+                    <input type="radio" checked={editDraft.entry_type === 'ingreso'} onChange={() => setEditDraft((d) => ({ ...d, entry_type: 'ingreso' }))} />
+                    Ingreso
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 400, textTransform: 'none' }}>
+                    <input type="radio" checked={editDraft.entry_type === 'egreso'} onChange={() => setEditDraft((d) => ({ ...d, entry_type: 'egreso' }))} />
+                    Egreso
+                  </label>
+                </div>
                 <select value={editDraft.category_id} onChange={(e) => setEditDraft((d) => ({ ...d, category_id: e.target.value }))}>
                   {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
@@ -180,6 +214,7 @@ export default function AdminFinance() {
               </div>
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ fontSize: 18 }}>{entry.entry_type === 'egreso' ? '🔴' : '💚'}</span>
                 <div style={{ flex: 1 }}>
                   <strong>{entry.category_name}</strong> — {money(entry.amount)}
                   <p className="muted" style={{ fontSize: 12, margin: '2px 0 0' }}>

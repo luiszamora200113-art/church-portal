@@ -6,6 +6,7 @@ export default function AdminLayout() {
   const { user, loading, token, API_URL } = useAuth();
   const location = useLocation();
   const [pendingCount, setPendingCount] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     if (!token) return;
@@ -14,6 +15,8 @@ export default function AdminLayout() {
       .then((list) => setPendingCount(Array.isArray(list) ? list.length : 0))
       .catch(() => {});
   }, [token, location.pathname]);
+
+  useEffect(() => { setMenuOpen(false); }, [location.pathname]);
 
   if (loading) return <p className="muted center">Cargando…</p>;
   if (!user) return <Navigate to="/login" replace />;
@@ -29,8 +32,11 @@ export default function AdminLayout() {
         <div className="admin-sidebar-brand">
           <img className="brand-logo" src="/assets/logo-claro.png" alt="Logo" />
           <span>Panel admin</span>
+          <button className="admin-nav-toggle" aria-label="Abrir menú" onClick={() => setMenuOpen((o) => !o)}>
+            {menuOpen ? '✕' : '☰'}
+          </button>
         </div>
-        <nav className="admin-nav">
+        <nav className={`admin-nav ${menuOpen ? 'open' : ''}`}>
           <Link className={linkClass('/admin/miembros')} to="/admin/miembros">Miembros</Link>
           <Link className={linkClass('/admin/celulas')} to="/admin/celulas">Células</Link>
           <Link className={linkClass('/admin/servicios')} to="/admin/servicios">Servicios</Link>
@@ -56,6 +62,7 @@ export default function AdminLayout() {
           </Link>
           <Link className={linkClass('/admin/deberes')} to="/admin/deberes">Deberes</Link>
           <Link className={linkClass('/admin/reportes')} to="/admin/reportes">Reportes</Link>
+          <Link className="admin-back-mobile" to="/dashboard">← Volver al portal</Link>
         </nav>
         <Link className="admin-back" to="/dashboard">← Volver al portal</Link>
       </aside>
