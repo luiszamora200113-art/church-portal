@@ -34,13 +34,15 @@ export default function MonthlySchedule() {
   const { token, API_URL } = useAuth();
   const [schedule, setSchedule] = useState(null);
   const [sundaySchool, setSundaySchool] = useState(null);
+  const [ministrySchedules, setMinistrySchedules] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([
       fetch(`${API_URL}/api/schedules?type=culto_mensual`, { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()),
       fetch(`${API_URL}/api/schedules?type=escuela_dominical`, { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()),
-    ]).then(async ([cultoList, dominicalList]) => {
+      fetch(`${API_URL}/api/ministries`, { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()),
+    ]).then(async ([cultoList, dominicalList, ministries]) => {
       if (cultoList.length > 0) {
         const res = await fetch(`${API_URL}/api/schedules/${cultoList[0].id}`, { headers: { Authorization: `Bearer ${token}` } });
         setSchedule(await res.json());
@@ -49,6 +51,18 @@ export default function MonthlySchedule() {
         const res = await fetch(`${API_URL}/api/schedules/${dominicalList[0].id}`, { headers: { Authorization: `Bearer ${token}` } });
         setSundaySchool(await res.json());
       }
+      // Para cada ministerio, trae su programación más reciente ya aprobada (si tiene alguna).
+      const withSchedules = await Promise.all(
+        ministries.map(async (m) => {
+          const listRes = await fetch(`${API_URL}/api/schedules?type=ministerio&ministry_id=${m.id}`, { headers: { Authorization: `Bearer ${token}` } });
+          const list = await listRes.json();
+          if (list.length === 0) return null;
+          const detailRes = await fetch(`${API_URL}/api/schedules/${list[0].id}`, { headers: { Authorization: `Bearer ${token}` } });
+          const detail = await detailRes.json();
+          return { ministry: m, schedule: detail };
+        })
+      );
+      setMinistrySchedules(withSchedules.filter(Boolean));
     }).finally(() => setLoading(false));
   }, [token]);
 
@@ -138,6 +152,33 @@ export default function MonthlySchedule() {
           </table>
         </div>
       )}
+
+      {ministrySchedules.map(({ ministry, schedule: ms }) => {
+        const fields = ministry.row_fields && ministry.row_fields.length > 0
+          ? ministry.row_fields
+          : [{ key: 'fecha', label: 'Fecha', type: 'fecha' }, { key: 'servicio', label: 'Servicio', type: 'texto' }, { key: 'miembros', label: 'Sirven', type: 'miembros' }, { key: 'notas', label: 'Notas', type: 'texto' }];
+        return (
+          <React.Fragment key={ministry.id}>
+            <div className="sched-section-divider" style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '28px 0 16px', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--muted)', fontWeight: 700 }}>
+              {ministry.icon} {ministry.name}
+            </div>
+            <div className="card">
+              <table className="sched-table">
+                <thead><tr>{fields.map((f) => <th key={f.key}>{f.label}</th>)}</tr></thead>
+                <tbody>
+                  {ms.rows.map((row) => (
+                    <tr key={row.id}>
+                      {fields.map((f) => (
+                        <td key={f.key}>{f.type === 'fecha' ? formatDay(row.data[f.key]) : row.data[f.key]}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </React.Fragment>
+        );
+      })}
     </div>
   );
 }
