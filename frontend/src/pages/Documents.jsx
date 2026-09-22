@@ -300,6 +300,7 @@ export default function Documents() {
   const [customTemplates, setCustomTemplates] = useState([]);
   const [roster, setRoster] = useState([]);
   const [myMinistries, setMyMinistries] = useState([]);
+  const [cellMembers, setCellMembers] = useState([]);
   useEffect(() => {
     fetch(`${API_URL}/api/custom-templates`, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
@@ -316,6 +317,10 @@ export default function Documents() {
       .then((r) => r.json())
       .then(setMyMinistries)
       .catch(() => {});
+    fetch(`${API_URL}/api/cells/mine`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((d) => setCellMembers(d.members || []))
+      .catch(() => {});
   }, [token]);
 
   // --- Programación de la célula ---
@@ -325,7 +330,7 @@ export default function Documents() {
   const [cellMsg, setCellMsg] = useState('');
 
   function updateCellAssignee(idx, field, memberId) {
-    const member = roster.find((m) => m.id === Number(memberId));
+    const member = cellMembers.find((m) => m.id === Number(memberId));
     const copy = [...cellRows];
     copy[idx] = { ...copy[idx], [`${field}_user_id`]: memberId, [field]: member ? member.full_name : '' };
     setCellRows(copy);
@@ -335,6 +340,7 @@ export default function Documents() {
   const [eventForm, setEventForm] = useState({ title: '', reference_date: '', location: '' });
   const [eventMeta, setEventMeta] = useState({ maestro_ceremonia: '', maestro_ceremonia_user_id: '', hora_inicio: '', hora_fin: '', celula: '', recursos: '', observaciones: '' });
   const [eventRows, setEventRows] = useState([emptyEventRow(), emptyEventRow()]);
+  const [includeProgram, setIncludeProgram] = useState(true);
   const [eventMsg, setEventMsg] = useState('');
 
   function updateEventAssignee(memberId) {
@@ -421,32 +427,41 @@ export default function Documents() {
         <label>Célula / ministerio responsable</label>
         <input value={eventMeta.celula} onChange={(e) => setEventMeta((m) => ({ ...m, celula: e.target.value }))} />
 
-        <label style={{ marginTop: 14 }}>Orden del programa</label>
-        <p className="muted" style={{ fontSize: 12, marginTop: -4 }}>
-          Para dividir el programa en bloques, escribe el nombre del bloque (ej. "BLOQUE 1") y deja el resto de esa fila vacío.
-        </p>
-        <table className="sched-table" style={{ marginTop: 6 }}>
-          <thead><tr><th>Bloque</th><th>Hora</th><th>Actividad</th><th>Participante</th><th>Cantos / Notas</th></tr></thead>
-          <tbody>
-            {eventRows.map((row, i) => (
-              <tr key={i}>
-                <td><input value={row.bloque} onChange={(e) => updateRow(eventRows, setEventRows, i, 'bloque', e.target.value)} placeholder="BLOQUE 1" style={{ border: 'none', background: 'transparent', padding: 0 }} /></td>
-                <td><input value={row.hora} onChange={(e) => updateRow(eventRows, setEventRows, i, 'hora', e.target.value)} placeholder="7:00 a 7:10" style={{ border: 'none', background: 'transparent', padding: 0 }} /></td>
-                <td><input value={row.actividad} onChange={(e) => updateRow(eventRows, setEventRows, i, 'actividad', e.target.value)} style={{ border: 'none', background: 'transparent', padding: 0 }} /></td>
-                <td>
-                  <select value={row.participante_user_id} onChange={(e) => updateEventRowAssignee(i, e.target.value)} style={{ border: 'none', background: 'transparent', padding: 0, fontSize: 13 }}>
-                    <option value="">Elegir…</option>
-                    {roster.map((m) => <option key={m.id} value={m.id}>{m.full_name}</option>)}
-                  </select>
-                </td>
-                <td><input value={row.notas} onChange={(e) => updateRow(eventRows, setEventRows, i, 'notas', e.target.value)} style={{ border: 'none', background: 'transparent', padding: 0 }} /></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <button className="btn-outline" style={{ marginTop: 8, fontSize: 12 }} onClick={() => setEventRows((r) => [...r, emptyEventRow()])}>
-          + Agregar fila
-        </button>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 18, fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
+          <input type="checkbox" checked={includeProgram} onChange={(e) => setIncludeProgram(e.target.checked)} />
+          Este evento necesita un orden del programa detallado (bloques, horarios, participantes)
+        </label>
+
+        {includeProgram && (
+          <>
+            <label style={{ marginTop: 14 }}>Orden del programa</label>
+            <p className="muted" style={{ fontSize: 12, marginTop: -4 }}>
+              Para dividir el programa en bloques, escribe el nombre del bloque (ej. "BLOQUE 1") y deja el resto de esa fila vacío.
+            </p>
+            <table className="sched-table" style={{ marginTop: 6 }}>
+              <thead><tr><th>Bloque</th><th>Hora</th><th>Actividad</th><th>Participante</th><th>Cantos / Notas</th></tr></thead>
+              <tbody>
+                {eventRows.map((row, i) => (
+                  <tr key={i}>
+                    <td><input value={row.bloque} onChange={(e) => updateRow(eventRows, setEventRows, i, 'bloque', e.target.value)} placeholder="BLOQUE 1" style={{ border: 'none', background: 'transparent', padding: 0 }} /></td>
+                    <td><input value={row.hora} onChange={(e) => updateRow(eventRows, setEventRows, i, 'hora', e.target.value)} placeholder="7:00 a 7:10" style={{ border: 'none', background: 'transparent', padding: 0 }} /></td>
+                    <td><input value={row.actividad} onChange={(e) => updateRow(eventRows, setEventRows, i, 'actividad', e.target.value)} style={{ border: 'none', background: 'transparent', padding: 0 }} /></td>
+                    <td>
+                      <select value={row.participante_user_id} onChange={(e) => updateEventRowAssignee(i, e.target.value)} style={{ border: 'none', background: 'transparent', padding: 0, fontSize: 13 }}>
+                        <option value="">Elegir…</option>
+                        {roster.map((m) => <option key={m.id} value={m.id}>{m.full_name}</option>)}
+                      </select>
+                    </td>
+                    <td><input value={row.notas} onChange={(e) => updateRow(eventRows, setEventRows, i, 'notas', e.target.value)} style={{ border: 'none', background: 'transparent', padding: 0 }} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <button className="btn-outline" style={{ marginTop: 8, fontSize: 12 }} onClick={() => setEventRows((r) => [...r, emptyEventRow()])}>
+              + Agregar fila
+            </button>
+          </>
+        )}
 
         <label style={{ marginTop: 14 }}>Recursos necesarios</label>
         <input value={eventMeta.recursos} onChange={(e) => setEventMeta((m) => ({ ...m, recursos: e.target.value }))} placeholder="Sonido, sillas, decoración..." />
@@ -460,12 +475,13 @@ export default function Documents() {
           onClick={() =>
             submitSchedule(
               'evento',
-              { title: eventForm.title, reference_date: eventForm.reference_date || null, location: eventForm.location, meta: eventMeta, rows: eventRows },
+              { title: eventForm.title, reference_date: eventForm.reference_date || null, location: eventForm.location, meta: eventMeta, rows: includeProgram ? eventRows : [] },
               setEventMsg,
               () => {
                 setEventForm({ title: '', reference_date: '', location: '' });
                 setEventMeta({ maestro_ceremonia: '', maestro_ceremonia_user_id: '', hora_inicio: '', hora_fin: '', celula: '', recursos: '', observaciones: '' });
                 setEventRows([emptyEventRow(), emptyEventRow()]);
+                setIncludeProgram(true);
               }
             )
           }
@@ -557,19 +573,19 @@ export default function Documents() {
                     <td>
                       <select value={row.dirige_user_id} onChange={(e) => updateCellAssignee(i, 'dirige', e.target.value)} style={{ border: 'none', background: 'transparent', padding: 0, fontSize: 13 }}>
                         <option value="">Elegir…</option>
-                        {roster.map((m) => <option key={m.id} value={m.id}>{m.full_name}</option>)}
+                        {cellMembers.map((m) => <option key={m.id} value={m.id}>{m.full_name}</option>)}
                       </select>
                     </td>
                     <td>
                       <select value={row.reflexion_user_id} onChange={(e) => updateCellAssignee(i, 'reflexion', e.target.value)} style={{ border: 'none', background: 'transparent', padding: 0, fontSize: 13 }}>
                         <option value="">Elegir…</option>
-                        {roster.map((m) => <option key={m.id} value={m.id}>{m.full_name}</option>)}
+                        {cellMembers.map((m) => <option key={m.id} value={m.id}>{m.full_name}</option>)}
                       </select>
                     </td>
                     <td>
                       <select value={row.lectura_user_id} onChange={(e) => updateCellAssignee(i, 'lectura', e.target.value)} style={{ border: 'none', background: 'transparent', padding: 0, fontSize: 13 }}>
                         <option value="">Elegir…</option>
-                        {roster.map((m) => <option key={m.id} value={m.id}>{m.full_name}</option>)}
+                        {cellMembers.map((m) => <option key={m.id} value={m.id}>{m.full_name}</option>)}
                       </select>
                     </td>
                     <td><input value={row.observacion} onChange={(e) => updateRow(cellRows, setCellRows, i, 'observacion', e.target.value)} placeholder="Estudio Génesis cap. 11" style={{ border: 'none', background: 'transparent', padding: 0 }} /></td>
