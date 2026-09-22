@@ -94,9 +94,9 @@ function Nav() {
         {['admin', 'superadmin'].includes(user.role) && (
           <Link to="/admin/miembros">Panel de administración</Link>
         )}
-        {user.role === 'finance' && <Link className={linkClass('/tesoreria')} to="/tesoreria">Tesorería</Link>}
-        {user.role === 'secretary' && <Link className={linkClass('/secretaria')} to="/secretaria">Secretaría</Link>}
-        {user.role === 'education' && <Link className={linkClass('/educacion')} to="/educacion">Educación Cristiana</Link>}
+        {['finance', 'admin', 'superadmin'].includes(user.role) && <Link className={linkClass('/tesoreria')} to="/tesoreria">Tesorería</Link>}
+        {['secretary', 'admin', 'superadmin'].includes(user.role) && <Link className={linkClass('/secretaria')} to="/secretaria">Secretaría</Link>}
+        {['education', 'admin', 'superadmin'].includes(user.role) && <Link className={linkClass('/educacion')} to="/educacion">Educación Cristiana</Link>}
         <a href="#" className="nav-logout" onClick={(e) => { e.preventDefault(); logout(); }}>Cerrar sesión</a>
       </nav>
     </div>
