@@ -198,7 +198,7 @@ router.delete('/members/:id', requireAuth, requireRole('admin', 'superadmin'), a
 // GET /api/auth/active-members -> listado y conteo de todas las cuentas activas (cualquier credencial cuenta como miembro oficial)
 router.get('/active-members', requireAuth, requireRole('admin', 'superadmin', 'secretary'), async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT id, full_name, role, created_at FROM users WHERE is_active = true ORDER BY full_name`
+    `SELECT id, full_name, role, created_at FROM users WHERE is_active = true AND role != 'superadmin' ORDER BY full_name`
   );
   res.json(rows);
 });
