@@ -245,7 +245,7 @@ router.get('/diezmos.pdf', requireAuth, requireRole('admin', 'superadmin', 'fina
 });
 
 // GET /api/reports/miembros.pdf?cell_id=1 -> listado de miembros, agrupado por célula (o solo una si se filtra)
-router.get('/miembros.pdf', requireAuth, requireRole('admin', 'superadmin'), async (req, res) => {
+router.get('/miembros.pdf', requireAuth, requireRole('admin', 'superadmin', 'secretary'), async (req, res) => {
   const { cell_id } = req.query;
   const { rows: cellList } = await pool.query(
     cell_id ? 'SELECT id, name FROM cells WHERE id = $1 ORDER BY id' : 'SELECT id, name FROM cells ORDER BY id',
