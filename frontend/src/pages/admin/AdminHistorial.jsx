@@ -57,6 +57,20 @@ export default function AdminHistorial() {
     return TYPE_LABELS[type] || customLabels[type] || type;
   }
 
+  async function handleDelete(item) {
+    if (!window.confirm(`¿Eliminar "${item.title}" por completo? Esta acción no se puede deshacer.`)) return;
+    const res = await fetch(`${API_URL}/api/schedules/${item.id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || 'No se pudo eliminar.');
+      return;
+    }
+    setItems((list) => list.filter((i) => i.id !== item.id));
+  }
+
   return (
     <div>
       <h1>Historial</h1>
@@ -93,6 +107,13 @@ export default function AdminHistorial() {
             onClick={() => downloadHistorialPdf(item.id, item.title, token, API_URL)}
           >
             📄 PDF
+          </button>
+          <button
+            className="btn-outline"
+            style={{ marginTop: 0, fontSize: 12, padding: '6px 12px', width: 'auto', color: '#b23b3b', borderColor: '#b23b3b' }}
+            onClick={() => handleDelete(item)}
+          >
+            🗑️ Eliminar
           </button>
         </div>
       ))}
