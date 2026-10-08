@@ -38,6 +38,12 @@ router.get('/', requireAuth, async (req, res) => {
   if (type === 'evento') {
     where += ` AND (s.reference_date IS NULL OR s.reference_date >= CURRENT_DATE)`;
   }
+  // Las programaciones mensuales caducan al terminar su mes (la de septiembre desaparece en octubre).
+  // El Historial del admin (/historial) no aplica este filtro, así que ahí se conserva todo.
+  const MONTHLY_TYPES = ['celula', 'culto_mensual', 'escuela_dominical', 'ministerio'];
+  if (MONTHLY_TYPES.includes(type)) {
+    where += ` AND (s.reference_date IS NULL OR s.reference_date >= date_trunc('month', CURRENT_DATE))`;
+  }
   const { rows } = await pool.query(
     `SELECT s.*, u.full_name AS created_by_name
      FROM schedules s JOIN users u ON u.id = s.created_by
