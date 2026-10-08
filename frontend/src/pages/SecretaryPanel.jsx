@@ -97,12 +97,18 @@ export default function SecretaryPanel() {
   const { user, loading, token, API_URL, logout } = useAuth();
   const [records, setRecords] = useState([]);
   const [activeMembers, setActiveMembers] = useState([]);
+  const [cells, setCells] = useState([]);
+  const [selectedCell, setSelectedCell] = useState('');
 
   useEffect(() => {
     if (!token) return;
     fetch(`${API_URL}/api/auth/active-members`, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
       .then(setActiveMembers)
+      .catch(() => {});
+    fetch(`${API_URL}/api/cells`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then(setCells)
       .catch(() => {});
   }, [token]);
 
@@ -114,6 +120,26 @@ export default function SecretaryPanel() {
   }
 
   useEffect(() => { if (token) loadRecords(); }, [token]);
+
+  // El PDF requiere el token: se descarga como blob y se dispara como archivo.
+  async function downloadMembersReport() {
+    const path = selectedCell ? `/api/reports/miembros.pdf?cell_id=${selectedCell}` : '/api/reports/miembros.pdf';
+    const cell = cells.find((c) => String(c.id) === selectedCell);
+    const safeName = cell ? cell.name.replace(/[^a-z0-9]+/gi, '-') : 'todas';
+    const res = await fetch(`${API_URL}${path}`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || 'No se pudo generar el reporte.');
+      return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `reporte-miembros-${safeName}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   if (loading) return <p className="muted center">Cargando…</p>;
   if (!user) return <Navigate to="/login" replace />;
@@ -141,6 +167,24 @@ export default function SecretaryPanel() {
         <p className="subtitle" style={{ marginBottom: 20 }}>Respaldo digital del acta física — bautizos y presentaciones de niños.</p>
         <RecordSection type="bautismo" title={`Bautismos (${baptisms.length})`} token={token} API_URL={API_URL} records={baptisms} reload={loadRecords} />
         <RecordSection type="presentacion" title={`Presentaciones de niños (${presentations.length})`} token={token} API_URL={API_URL} records={presentations} reload={loadRecords} />
+
+        <div className="card">
+          <h2>Reporte de membresía</h2>
+          <p className="muted" style={{ fontSize: 12, marginBottom: 12 }}>
+            Descarga el listado de miembros en PDF, de toda la iglesia o de una sola célula.
+          </p>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+            <select value={selectedCell} onChange={(e) => setSelectedCell(e.target.value)} style={{ maxWidth: 260 }}>
+              <option value="">Todos los miembros</option>
+              {cells.map((c) => (
+                <option key={c.id} value={c.id}>Solo {c.name}</option>
+              ))}
+            </select>
+            <button className="primary" style={{ marginTop: 0, width: 'auto', padding: '10px 18px' }} onClick={downloadMembersReport}>
+              Descargar PDF
+            </button>
+          </div>
+        </div>
 
         <div className="card">
           <h2>Miembros activos ({activeMembers.length})</h2>
