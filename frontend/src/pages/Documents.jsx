@@ -239,7 +239,7 @@ function MinistryScheduleForm({ ministry, roster, token, API_URL }) {
       <label>Título (ej. Programa {ministry.name} — Octubre 2026)</label>
       <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
       <label>Mes que cubre</label>
-      <input type="date" value={form.reference_date} onChange={(e) => setForm((f) => ({ ...f, reference_date: e.target.value }))} />
+      <input type="month" value={((form.reference_date) || '').slice(0, 7)} onChange={(e) => setForm((f) => ({ ...f, reference_date: e.target.value ? `${e.target.value}-01` : '' }))} />
 
       <label style={{ marginTop: 14 }}>Programación</label>
       <table className="sched-table" style={{ marginTop: 6 }}>
@@ -495,7 +495,7 @@ export default function Documents() {
           <label>Título (ej. Programación de Cultos — Septiembre 2026)</label>
           <input value={cultoForm.title} onChange={(e) => setCultoForm((f) => ({ ...f, title: e.target.value }))} />
           <label>Mes que cubre</label>
-          <input type="date" value={cultoForm.reference_date} onChange={(e) => setCultoForm((f) => ({ ...f, reference_date: e.target.value }))} />
+          <input type="month" value={((cultoForm.reference_date) || '').slice(0, 7)} onChange={(e) => setCultoForm((f) => ({ ...f, reference_date: e.target.value ? `${e.target.value}-01` : '' }))} />
 
           <label style={{ marginTop: 14 }}>Fechas del mes</label>
           <table className="sched-table" style={{ marginTop: 6 }}>
@@ -558,7 +558,7 @@ export default function Documents() {
             <label>Título (ej. Programa Célula 3 — Septiembre 2026)</label>
             <input value={cellForm.title} onChange={(e) => setCellForm((f) => ({ ...f, title: e.target.value }))} />
             <label>Mes que cubre</label>
-            <input type="date" value={cellForm.reference_date} onChange={(e) => setCellForm((f) => ({ ...f, reference_date: e.target.value }))} />
+            <input type="month" value={((cellForm.reference_date) || '').slice(0, 7)} onChange={(e) => setCellForm((f) => ({ ...f, reference_date: e.target.value ? `${e.target.value}-01` : '' }))} />
 
             <label style={{ marginTop: 14 }}>Reuniones del mes</label>
             <p className="muted" style={{ fontSize: 12, marginTop: -4 }}>
