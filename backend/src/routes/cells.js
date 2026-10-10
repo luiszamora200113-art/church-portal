@@ -61,6 +61,25 @@ router.get('/roster', requireAuth, async (req, res) => {
   res.json(rows);
 });
 
+// GET /api/cells/leaders -> solo los miembros asignados como líder (de célula o de ministerio), con dónde lideran.
+// Sirve para los campos "Elegir líderes" de las plantillas (convocar solo a líderes, no a toda la lista).
+router.get('/leaders', requireAuth, async (req, res) => {
+  const { rows } = await pool.query(`
+    SELECT u.id, u.full_name,
+      concat_ws(', ',
+        (SELECT string_agg(c.name, ', ' ORDER BY c.name) FROM cells c WHERE c.leader_id = u.id),
+        (SELECT string_agg(m.name, ', ' ORDER BY m.name)
+           FROM ministry_leaders ml JOIN ministries m ON m.id = ml.ministry_id WHERE ml.user_id = u.id)
+      ) AS leader_of
+    FROM users u
+    WHERE u.is_active = true AND u.role <> 'superadmin'
+      AND (EXISTS (SELECT 1 FROM cells c WHERE c.leader_id = u.id)
+           OR EXISTS (SELECT 1 FROM ministry_leaders ml WHERE ml.user_id = u.id))
+    ORDER BY u.full_name
+  `);
+  res.json(rows);
+});
+
 // GET /api/cells/members-overview -> lista de miembros con su célula actual (solo admin, para reasignar)
 router.get('/members-overview', requireAuth, requireRole('admin', 'superadmin', 'secretary'), async (req, res) => {
   const { rows } = await pool.query(`
