@@ -4,7 +4,7 @@ const { requireAuth, requireRole } = require('../middleware/auth');
 const { userCanFill } = require('../utils/templateAccess');
 
 const router = express.Router();
-const VALID_FIELD_TYPES = ['texto', 'fecha', 'miembro', 'miembros'];
+const VALID_FIELD_TYPES = ['texto', 'fecha', 'miembro', 'miembros', 'lider', 'lideres'];
 const VALID_PUBLISH = ['ninguno', 'eventos', 'programacion'];
 
 function validateFields(fields) {
