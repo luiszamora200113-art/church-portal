@@ -258,6 +258,9 @@ const ALTER_STATEMENTS = [
   `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS schedule_id INTEGER REFERENCES schedules(id) ON DELETE CASCADE;`,
   `ALTER TABLE ministries ADD COLUMN IF NOT EXISTS row_fields JSONB NOT NULL DEFAULT '[{"key":"fecha","label":"Fecha","type":"fecha"},{"key":"servicio","label":"Servicio","type":"texto"},{"key":"miembros","label":"Sirven","type":"miembros"},{"key":"notas","label":"Notas","type":"texto"}]';`,
   `ALTER TABLE finance_entries ADD COLUMN IF NOT EXISTS entry_type VARCHAR(10) NOT NULL DEFAULT 'ingreso';`,
+  // Destino de publicación de la plantilla ('ninguno' | 'eventos' | 'programacion') y encargados asignados (ids de usuario).
+  `ALTER TABLE custom_templates ADD COLUMN IF NOT EXISTS publish_to VARCHAR(20) NOT NULL DEFAULT 'ninguno';`,
+  `ALTER TABLE custom_templates ADD COLUMN IF NOT EXISTS assigned_users JSONB;`,
 ];
 
 async function migrate() {
