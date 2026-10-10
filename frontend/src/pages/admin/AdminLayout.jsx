@@ -42,9 +42,7 @@ export default function AdminLayout() {
           <Link className={linkClass('/admin/servicios')} to="/admin/servicios">Servicios</Link>
           <Link className={linkClass('/admin/ministerios')} to="/admin/ministerios">Ministerios</Link>
           <Link className={linkClass('/admin/historial')} to="/admin/historial">Historial</Link>
-          {user.role === 'superadmin' && (
-            <Link className={linkClass('/admin/plantillas')} to="/admin/plantillas">Plantillas</Link>
-          )}
+          <Link className={linkClass('/admin/plantillas')} to="/admin/plantillas">Plantillas</Link>
           {user.role === 'superadmin' && (
             <Link className={linkClass('/admin/conocenos')} to="/admin/conocenos">Conócenos</Link>
           )}

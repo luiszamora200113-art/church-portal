@@ -50,9 +50,18 @@ function RequireAuthOnly({ children }) {
 }
 
 function Nav() {
-  const { user, logout } = useAuth();
+  const { user, logout, token, API_URL } = useAuth();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = React.useState(false);
+  // ¿Tiene alguna plantilla asignada para llenar? Si sí, ve el enlace a Documentos aunque no sea secretaría/admin.
+  const [hasTemplates, setHasTemplates] = React.useState(false);
+  React.useEffect(() => {
+    if (!user || !token) return;
+    fetch(`${API_URL}/api/custom-templates/mine`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((list) => setHasTemplates(Array.isArray(list) && list.length > 0))
+      .catch(() => {});
+  }, [user, token]);
 
   React.useEffect(() => { setMenuOpen(false); }, [location.pathname]);
 
@@ -88,7 +97,7 @@ function Nav() {
         )}
         <Link className={linkClass('/eventos')} to="/eventos">Eventos</Link>
         <Link className={linkClass('/programacion')} to="/programacion">Programación</Link>
-        {['admin', 'superadmin', 'secretary'].includes(user.role) && (
+        {(['admin', 'superadmin', 'secretary'].includes(user.role) || hasTemplates) && (
           <Link className={linkClass('/documentos')} to="/documentos">Documentos</Link>
         )}
         {['admin', 'superadmin'].includes(user.role) && (

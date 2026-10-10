@@ -67,6 +67,9 @@ export default function AdminTemplates() {
   const [headerFields, setHeaderFields] = useState([emptyField()]);
   const [rowFields, setRowFields] = useState([]);
   const [allowedRoles, setAllowedRoles] = useState([]); // vacío = cualquiera
+  const [publishTo, setPublishTo] = useState('ninguno');
+  const [assignedUsers, setAssignedUsers] = useState([]); // ids de encargados; vacío = aplican los roles
+  const [roster, setRoster] = useState([]);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -77,7 +80,15 @@ export default function AdminTemplates() {
       .catch(() => {});
   }
 
-  useEffect(() => { loadTemplates(); }, [token]);
+  useEffect(() => {
+    loadTemplates();
+    fetch(`${API_URL}/api/cells/roster`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json()).then(setRoster).catch(() => {});
+  }, [token]);
+
+  function toggleAssigned(id) {
+    setAssignedUsers((a) => (a.includes(id) ? a.filter((x) => x !== id) : [...a, id]));
+  }
 
   function toggleRole(role) {
     setAllowedRoles((r) => (r.includes(role) ? r.filter((x) => x !== role) : [...r, role]));
@@ -86,7 +97,7 @@ export default function AdminTemplates() {
   function resetForm() {
     setEditingId(null);
     setName(''); setDescription(''); setIcon('📄');
-    setHeaderFields([emptyField()]); setRowFields([]); setAllowedRoles([]);
+    setHeaderFields([emptyField()]); setRowFields([]); setAllowedRoles([]); setPublishTo('ninguno'); setAssignedUsers([]);
     setError(''); setMessage('');
   }
 
@@ -98,6 +109,8 @@ export default function AdminTemplates() {
     setHeaderFields(t.header_fields.length ? t.header_fields : [emptyField()]);
     setRowFields(t.row_fields);
     setAllowedRoles(t.allowed_roles || []);
+    setPublishTo(t.publish_to || 'ninguno');
+    setAssignedUsers((t.assigned_users || []).map(Number));
     setError(''); setMessage('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -112,6 +125,8 @@ export default function AdminTemplates() {
       header_fields: headerFields.filter((f) => f.label.trim()),
       row_fields: rowFields.filter((f) => f.label.trim()),
       allowed_roles: allowedRoles,
+      publish_to: publishTo,
+      assigned_users: assignedUsers,
     };
 
     const res = await fetch(
@@ -138,8 +153,8 @@ export default function AdminTemplates() {
     loadTemplates();
   }
 
-  if (user?.role !== 'superadmin') {
-    return <p className="muted">Solo el superadmin puede crear plantillas nuevas.</p>;
+  if (!['admin', 'superadmin'].includes(user?.role)) {
+    return <p className="muted">Solo admin y superadmin pueden crear plantillas nuevas.</p>;
   }
 
   return (
@@ -171,7 +186,30 @@ export default function AdminTemplates() {
           setFields={setRowFields}
         />
 
-        <label style={{ marginTop: 14 }}>¿Quién puede llenarla?</label>
+        <label style={{ marginTop: 14 }}>Destino de publicación (al aprobarse)</label>
+        <select value={publishTo} onChange={(e) => setPublishTo(e.target.value)}>
+          <option value="ninguno">Solo queda en Documentos / Historial</option>
+          <option value="eventos">Publicar en la sección Eventos</option>
+          <option value="programacion">Publicar en la sección Programación</option>
+        </select>
+        <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>
+          Eventos: pide una fecha y desaparece al pasar el día. Programación: pide el mes y desaparece al terminar el mes. En ambos casos queda guardado en el Historial.
+        </p>
+
+        <label style={{ marginTop: 14 }}>Encargado(s) asignado(s) a llenarla</label>
+        <div style={{ border: '1px solid var(--line)', borderRadius: 10, padding: '10px 14px', maxHeight: 200, overflowY: 'auto' }}>
+          {roster.map((m) => (
+            <label key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 400, textTransform: 'none', letterSpacing: 0, fontSize: 14, padding: '4px 0' }}>
+              <input type="checkbox" checked={assignedUsers.includes(m.id)} onChange={() => toggleAssigned(m.id)} />
+              {m.full_name}
+            </label>
+          ))}
+        </div>
+        <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>
+          Si eliges encargados, solo ellos (y admin/superadmin) verán esta plantilla en Documentos y recibirán un aviso. Si no eliges ninguno, se usa la selección de roles de abajo.
+        </p>
+
+        <label style={{ marginTop: 14 }}>¿Quién puede llenarla? (por rol)</label>
         <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 10 }}>
           {ROLE_OPTIONS.map((r) => (
             <label key={r.value} style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 400, fontSize: 13 }}>
@@ -199,6 +237,10 @@ export default function AdminTemplates() {
             <div style={{ flex: 1 }}>
               <strong>{t.name}</strong>
               {t.description && <p className="muted" style={{ fontSize: 12, margin: '2px 0 0' }}>{t.description}</p>}
+              <p className="muted" style={{ fontSize: 11, margin: '2px 0 0' }}>
+                Publica en: {t.publish_to === 'eventos' ? 'Eventos' : t.publish_to === 'programacion' ? 'Programación' : 'Solo Documentos'}
+                {t.assigned_users && t.assigned_users.length > 0 ? ` · ${t.assigned_users.length} encargado(s)` : ''}
+              </p>
             </div>
             <button className="btn-outline" style={{ fontSize: 12, padding: '5px 10px' }} onClick={() => startEdit(t)}>Editar</button>
             <button className="btn-outline" style={{ fontSize: 12, padding: '5px 10px' }} onClick={() => handleDelete(t.id)}>Quitar</button>

@@ -41,6 +41,8 @@ function CustomTemplateForm({ template, roster, token, API_URL }) {
   const [header, setHeader] = useState(emptyHeader());
   const [rows, setRows] = useState(template.row_fields.length > 0 ? [emptyRow(), emptyRow()] : []);
   const [msg, setMsg] = useState('');
+  // Fecha (Eventos) o mes (Programación) de referencia, según el destino de publicación de la plantilla.
+  const [refDate, setRefDate] = useState('');
 
   function updateHeaderField(field, f) {
     if (f.type === 'miembro') {
@@ -101,17 +103,21 @@ function CustomTemplateForm({ template, roster, token, API_URL }) {
   }
 
   async function handleSubmit() {
+    if (template.publish_to && template.publish_to !== 'ninguno' && !refDate) {
+      setMsg(template.publish_to === 'eventos' ? 'Indica la fecha del evento.' : 'Indica el mes que cubre.');
+      return;
+    }
     setMsg('Enviando…');
     try {
       const res = await fetch(`${API_URL}/api/schedules`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ type: template.type_key, title: title || template.name, meta: header, rows }),
+        body: JSON.stringify({ type: template.type_key, title: title || template.name, reference_date: refDate || null, meta: header, rows }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'No se pudo enviar.');
       setMsg('Enviado. Quedó pendiente de aprobación del pastor.');
-      setTitle(''); setHeader(emptyHeader()); setRows(template.row_fields.length > 0 ? [emptyRow(), emptyRow()] : []);
+      setTitle(''); setRefDate(''); setHeader(emptyHeader()); setRows(template.row_fields.length > 0 ? [emptyRow(), emptyRow()] : []);
     } catch (err) {
       setMsg(err.message);
     }
@@ -121,6 +127,18 @@ function CustomTemplateForm({ template, roster, token, API_URL }) {
     <>
       <label>Título</label>
       <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={template.name} />
+      {template.publish_to === 'eventos' && (
+        <>
+          <label>Fecha del evento</label>
+          <input type="date" value={refDate} onChange={(e) => setRefDate(e.target.value)} />
+        </>
+      )}
+      {template.publish_to === 'programacion' && (
+        <>
+          <label>Mes que cubre</label>
+          <input type="month" value={refDate.slice(0, 7)} onChange={(e) => setRefDate(e.target.value ? `${e.target.value}-01` : '')} />
+        </>
+      )}
 
       {template.header_fields.map((f) => (
         <React.Fragment key={f.key}>
@@ -293,6 +311,41 @@ function MinistryScheduleForm({ ministry, roster, token, API_URL }) {
   );
 }
 
+const BUILTIN_DEST = { evento: 'Eventos', culto_mensual: 'Programación', escuela_dominical: 'Programación', ministerio: 'Programación', celula: 'Mi célula' };
+
+function submissionStatus(s) {
+  if (s.status === 'pending') return 'Pendiente de aprobación';
+  if (s.status === 'rejected') return `Rechazado${s.review_comment ? ` — ${s.review_comment}` : ''}`;
+  const dest = s.template_name
+    ? ({ eventos: 'Eventos', programacion: 'Programación' }[s.publish_to] || null)
+    : BUILTIN_DEST[s.type] || null;
+  return dest ? `Aprobado / Publicado en ${dest}` : 'Aprobado';
+}
+
+// Historial de lo que el usuario envió y en qué estado está (se mantiene aunque ya esté publicado).
+function MySubmissions({ token, API_URL }) {
+  const [items, setItems] = useState([]);
+  function load() {
+    fetch(`${API_URL}/api/schedules/mine`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((d) => setItems(Array.isArray(d) ? d : []))
+      .catch(() => {});
+  }
+  useEffect(() => { load(); }, [token]);
+  return (
+    <>
+      <button className="btn-outline" style={{ fontSize: 12, marginBottom: 8 }} onClick={load}>Actualizar</button>
+      {items.length === 0 && <p className="muted">Aún no has enviado nada.</p>}
+      {items.map((s) => (
+        <div key={s.id} style={{ borderBottom: '1px solid var(--line)', padding: '8px 0' }}>
+          <strong>{s.title}</strong>
+          <p className="muted" style={{ fontSize: 12, margin: '2px 0 0' }}>{submissionStatus(s)}</p>
+        </div>
+      ))}
+    </>
+  );
+}
+
 export default function Documents() {
   const { user, token, API_URL } = useAuth();
 
@@ -302,11 +355,11 @@ export default function Documents() {
   const [myMinistries, setMyMinistries] = useState([]);
   const [cellMembers, setCellMembers] = useState([]);
   useEffect(() => {
-    fetch(`${API_URL}/api/custom-templates`, { headers: { Authorization: `Bearer ${token}` } })
+    fetch(`${API_URL}/api/custom-templates/mine`, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
       .then((all) => {
         const isPrivileged = ['admin', 'superadmin'].includes(user?.role);
-        setCustomTemplates(all.filter((t) => isPrivileged || !t.allowed_roles || t.allowed_roles.includes(user?.role)));
+        setCustomTemplates(Array.isArray(all) ? all : []); // el backend ya filtra por encargados asignados / roles
       })
       .catch(() => {});
     fetch(`${API_URL}/api/cells/roster`, { headers: { Authorization: `Bearer ${token}` } })
@@ -625,6 +678,10 @@ export default function Documents() {
           <MinistryScheduleForm ministry={m} roster={roster} token={token} API_URL={API_URL} />
         </Accordion>
       ))}
+
+      <Accordion title="Mis envíos" subtitle="Estado de lo que enviaste: pendiente, publicado o rechazado" icon="🗂️">
+        <MySubmissions token={token} API_URL={API_URL} />
+      </Accordion>
 
       {customTemplates.map((t) => (
         <Accordion key={t.id} title={t.name} subtitle={t.description || 'Plantilla personalizada'} icon={t.icon}>

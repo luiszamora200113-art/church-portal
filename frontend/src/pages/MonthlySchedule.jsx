@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
+import PublishedSchedules from '../components/PublishedSchedules.jsx';
 
 function formatMonth(d) {
   if (!d) return '';
@@ -179,6 +180,8 @@ export default function MonthlySchedule() {
           </React.Fragment>
         );
       })}
+
+      <PublishedSchedules destination="programacion" />
     </div>
   );
 }

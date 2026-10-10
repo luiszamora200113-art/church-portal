@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import PublishedSchedules from '../components/PublishedSchedules.jsx';
 
 function formatDate(d) {
   if (!d) return '';
@@ -140,6 +141,8 @@ export default function Events() {
           )}
         </div>
       ))}
+
+      <PublishedSchedules destination="eventos" />
     </div>
   );
 }

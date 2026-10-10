@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../config/db');
 const { requireAuth, requireRole } = require('../middleware/auth');
+const { userCanFill } = require('../utils/templateAccess');
 
 const router = express.Router();
 
@@ -75,6 +76,43 @@ router.get('/historial', requireAuth, requireRole('admin', 'superadmin'), async 
   res.json(rows);
 });
 
+// GET /api/schedules/published?destination=eventos|programacion -> lo aprobado desde plantillas personalizadas
+// cuyo destino de publicación coincide. Eventos caduca al pasar la fecha; Programación al terminar el mes.
+router.get('/published', requireAuth, async (req, res) => {
+  const { destination } = req.query;
+  if (!['eventos', 'programacion'].includes(destination)) {
+    return res.status(400).json({ error: 'destination debe ser "eventos" o "programacion".' });
+  }
+  const expiry = destination === 'eventos'
+    ? 'AND (s.reference_date IS NULL OR s.reference_date >= CURRENT_DATE)'
+    : "AND (s.reference_date IS NULL OR s.reference_date >= date_trunc('month', CURRENT_DATE))";
+  const { rows } = await pool.query(
+    `SELECT s.*, u.full_name AS created_by_name,
+       ct.name AS template_name, ct.icon AS template_icon, ct.header_fields, ct.row_fields
+     FROM schedules s
+     JOIN users u ON u.id = s.created_by
+     JOIN custom_templates ct ON ct.type_key = s.type
+     WHERE s.status = 'approved' AND ct.publish_to = $1 ${expiry}
+     ORDER BY s.reference_date ASC NULLS LAST, s.created_at DESC`,
+    [destination]
+  );
+  res.json(rows);
+});
+
+// GET /api/schedules/mine -> lo que yo envié, con su estado (pendiente / publicado / rechazado)
+router.get('/mine', requireAuth, async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT s.id, s.type, s.title, s.status, s.reference_date, s.review_comment, s.created_at,
+       ct.name AS template_name, ct.publish_to
+     FROM schedules s
+     LEFT JOIN custom_templates ct ON ct.type_key = s.type
+     WHERE s.created_by = $1
+     ORDER BY s.created_at DESC LIMIT 50`,
+    [req.user.id]
+  );
+  res.json(rows);
+});
+
 // GET /api/schedules/:id -> detalle con filas (cualquiera con acceso a la aprobada; admin ve cualquier estado)
 router.get('/:id', requireAuth, async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM schedules WHERE id = $1', [req.params.id]);
@@ -109,12 +147,11 @@ router.post('/', requireAuth, validateType, async (req, res) => {
   if (!allowedRoles) {
     // No es uno de los tipos fijos restringidos; si es una plantilla personalizada, respeta sus roles permitidos.
     const { rows: templateRows } = await pool.query(
-      'SELECT allowed_roles FROM custom_templates WHERE type_key = $1',
+      'SELECT * FROM custom_templates WHERE type_key = $1',
       [type]
     );
-    const customAllowed = templateRows[0]?.allowed_roles;
-    const isPrivileged = ['admin', 'superadmin'].includes(req.user.role);
-    if (customAllowed && !customAllowed.includes(req.user.role) && !isPrivileged) {
+    // Si la plantilla tiene encargados asignados, solo ellos (y admin/superadmin) pueden llenarla; si no, aplican los roles permitidos.
+    if (templateRows[0] && !userCanFill(templateRows[0], req.user)) {
       return res.status(403).json({ error: 'No tienes permiso para enviar este tipo de programación.' });
     }
   }
