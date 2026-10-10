@@ -21,18 +21,18 @@ function Accordion({ title, subtitle, icon, children }) {
   );
 }
 
-function CustomTemplateForm({ template, roster, token, API_URL }) {
+function CustomTemplateForm({ template, roster, leaders = [], token, API_URL }) {
   const emptyHeader = () => Object.fromEntries(
     template.header_fields.flatMap((f) => {
-      if (f.type === 'miembro') return [[f.key, ''], [`${f.key}_user_id`, '']];
-      if (f.type === 'miembros') return [[f.key, ''], [`${f.key}_user_ids`, []]];
+      if (f.type === 'miembro' || f.type === 'lider') return [[f.key, ''], [`${f.key}_user_id`, '']];
+      if (f.type === 'miembros' || f.type === 'lideres') return [[f.key, ''], [`${f.key}_user_ids`, []]];
       return [[f.key, '']];
     })
   );
   const emptyRow = () => Object.fromEntries(
     template.row_fields.flatMap((f) => {
-      if (f.type === 'miembro') return [[f.key, ''], [`${f.key}_user_id`, '']];
-      if (f.type === 'miembros') return [[f.key, ''], [`${f.key}_user_ids`, []]];
+      if (f.type === 'miembro' || f.type === 'lider') return [[f.key, ''], [`${f.key}_user_id`, '']];
+      if (f.type === 'miembros' || f.type === 'lideres') return [[f.key, ''], [`${f.key}_user_ids`, []]];
       return [[f.key, '']];
     })
   );
@@ -44,9 +44,12 @@ function CustomTemplateForm({ template, roster, token, API_URL }) {
   // Fecha (Eventos) o mes (Programación) de referencia, según el destino de publicación de la plantilla.
   const [refDate, setRefDate] = useState('');
 
+  // Lista de donde se elige: los campos de "líder" usan solo líderes asignados; los de "miembro", todos.
+  const pickList = (f) => (f.type === 'lider' || f.type === 'lideres' ? leaders : roster);
+
   function updateHeaderField(field, f) {
-    if (f.type === 'miembro') {
-      const m = roster.find((r) => r.id === Number(field));
+    if (f.type === 'miembro' || f.type === 'lider') {
+      const m = pickList(f).find((r) => r.id === Number(field));
       setHeader((h) => ({ ...h, [f.key]: m ? m.full_name : '', [`${f.key}_user_id`]: field }));
     } else {
       setHeader((h) => ({ ...h, [f.key]: field }));
@@ -57,15 +60,22 @@ function CustomTemplateForm({ template, roster, token, API_URL }) {
     setHeader((h) => {
       const current = h[`${f.key}_user_ids`] || [];
       const next = current.includes(memberId) ? current.filter((id) => id !== memberId) : [...current, memberId];
-      const names = roster.filter((m) => next.includes(m.id)).map((m) => m.full_name).join(', ');
+      const names = pickList(f).filter((m) => next.includes(m.id)).map((m) => m.full_name).join(', ');
       return { ...h, [f.key]: names, [`${f.key}_user_ids`]: next };
+    });
+  }
+
+  function setHeaderMulti(f, ids) {
+    setHeader((h) => {
+      const names = pickList(f).filter((m) => ids.includes(m.id)).map((m) => m.full_name).join(', ');
+      return { ...h, [f.key]: names, [`${f.key}_user_ids`]: ids };
     });
   }
 
   function updateRowField(idx, f, value) {
     const copy = [...rows];
-    if (f.type === 'miembro') {
-      const m = roster.find((r) => r.id === Number(value));
+    if (f.type === 'miembro' || f.type === 'lider') {
+      const m = pickList(f).find((r) => r.id === Number(value));
       copy[idx] = { ...copy[idx], [f.key]: m ? m.full_name : '', [`${f.key}_user_id`]: value };
     } else {
       copy[idx] = { ...copy[idx], [f.key]: value };
@@ -75,27 +85,45 @@ function CustomTemplateForm({ template, roster, token, API_URL }) {
 
   function renderField(f, value, onChange) {
     if (f.type === 'fecha') return <input type="date" value={value} onChange={(e) => onChange(e.target.value)} />;
-    if (f.type === 'miembro') {
+    if (f.type === 'miembro' || f.type === 'lider') {
+      const list = pickList(f);
       return (
         <select value={header[`${f.key}_user_id`] || ''} onChange={(e) => onChange(e.target.value)}>
-          <option value="">Elegir miembro…</option>
-          {roster.map((m) => <option key={m.id} value={m.id}>{m.full_name}</option>)}
+          <option value="">{f.type === 'lider' ? 'Elegir líder…' : 'Elegir miembro…'}</option>
+          {list.map((m) => <option key={m.id} value={m.id}>{m.full_name}{m.leader_of ? ` — ${m.leader_of}` : ''}</option>)}
         </select>
       );
     }
-    if (f.type === 'miembros') {
+    if (f.type === 'miembros' || f.type === 'lideres') {
+      const list = pickList(f);
       const selected = header[`${f.key}_user_ids`] || [];
       return (
-        <div style={{ border: '1px solid var(--line)', borderRadius: 10, padding: '10px 14px', maxHeight: 220, overflowY: 'auto' }}>
-          {roster.map((m) => (
-            <label key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 400, textTransform: 'none', letterSpacing: 0, fontSize: 14, padding: '4px 0' }}>
-              <input type="checkbox" checked={selected.includes(m.id)} onChange={() => toggleHeaderMulti(f, m.id)} />
-              {m.full_name}
-            </label>
-          ))}
-          {selected.length > 0 && (
-            <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>{selected.length} seleccionado(s): {header[f.key]}</p>
-          )}
+        <div className="member-picker">
+          <div className="member-picker-bar">
+            <span>{selected.length} de {list.length} seleccionado(s)</span>
+            <span className="actions">
+              <button type="button" className="btn-outline" onClick={() => setHeaderMulti(f, list.map((m) => m.id))}>Seleccionar todos</button>
+              <button type="button" className="btn-outline" onClick={() => setHeaderMulti(f, [])}>Limpiar</button>
+            </span>
+          </div>
+          <div className="member-picker-list">
+            {list.length === 0 && (
+              <p className="member-picker-empty">
+                {f.type === 'lideres'
+                  ? 'Aún no hay líderes asignados. El administrador los asigna en Células o Ministerios.'
+                  : 'No hay miembros para elegir.'}
+              </p>
+            )}
+            {list.map((m) => (
+              <label key={m.id} className={`member-option ${selected.includes(m.id) ? 'checked' : ''}`}>
+                <input type="checkbox" checked={selected.includes(m.id)} onChange={() => toggleHeaderMulti(f, m.id)} />
+                <span className="who">
+                  <strong>{m.full_name}</strong>
+                  {m.leader_of && <small>Líder de {m.leader_of}</small>}
+                </span>
+              </label>
+            ))}
+          </div>
         </div>
       );
     }
@@ -157,10 +185,10 @@ function CustomTemplateForm({ template, roster, token, API_URL }) {
                 <tr key={i}>
                   {template.row_fields.map((f) => (
                     <td key={f.key}>
-                      {f.type === 'miembro' ? (
+                      {(f.type === 'miembro' || f.type === 'lider') ? (
                         <select value={row[`${f.key}_user_id`] || ''} onChange={(e) => updateRowField(i, f, e.target.value)} style={{ border: 'none', background: 'transparent', padding: 0, fontSize: 13 }}>
-                          <option value="">Elegir miembro…</option>
-                          {roster.map((m) => <option key={m.id} value={m.id}>{m.full_name}</option>)}
+                          <option value="">{f.type === 'lider' ? 'Elegir líder…' : 'Elegir miembro…'}</option>
+                          {pickList(f).map((m) => <option key={m.id} value={m.id}>{m.full_name}</option>)}
                         </select>
                       ) : (
                         <input
@@ -200,8 +228,8 @@ function MinistryScheduleForm({ ministry, roster, token, API_URL }) {
 
   const emptyRow = () => Object.fromEntries(
     fields.flatMap((f) => {
-      if (f.type === 'miembro') return [[f.key, ''], [`${f.key}_user_id`, '']];
-      if (f.type === 'miembros') return [[f.key, ''], [`${f.key}_user_ids`, []]];
+      if (f.type === 'miembro' || f.type === 'lider') return [[f.key, ''], [`${f.key}_user_id`, '']];
+      if (f.type === 'miembros' || f.type === 'lideres') return [[f.key, ''], [`${f.key}_user_ids`, []]];
       return [[f.key, '']];
     })
   );
@@ -352,6 +380,7 @@ export default function Documents() {
   // --- Plantillas personalizadas creadas por el superadmin ---
   const [customTemplates, setCustomTemplates] = useState([]);
   const [roster, setRoster] = useState([]);
+  const [leaders, setLeaders] = useState([]); // solo miembros asignados como líder (célula o ministerio)
   const [myMinistries, setMyMinistries] = useState([]);
   const [cellMembers, setCellMembers] = useState([]);
   useEffect(() => {
@@ -365,6 +394,10 @@ export default function Documents() {
     fetch(`${API_URL}/api/cells/roster`, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
       .then(setRoster)
+      .catch(() => {});
+    fetch(`${API_URL}/api/cells/leaders`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((d) => setLeaders(Array.isArray(d) ? d : []))
       .catch(() => {});
     fetch(`${API_URL}/api/ministries/mine`, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
@@ -685,7 +718,7 @@ export default function Documents() {
 
       {customTemplates.map((t) => (
         <Accordion key={t.id} title={t.name} subtitle={t.description || 'Plantilla personalizada'} icon={t.icon}>
-          <CustomTemplateForm template={t} roster={roster} token={token} API_URL={API_URL} />
+          <CustomTemplateForm template={t} roster={roster} leaders={leaders} token={token} API_URL={API_URL} />
         </Accordion>
       ))}
     </div>
