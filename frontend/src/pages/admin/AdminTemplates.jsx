@@ -6,6 +6,8 @@ const FIELD_TYPES = [
   { value: 'fecha', label: 'Fecha' },
   { value: 'miembro', label: 'Elegir un miembro (notifica automático)' },
   { value: 'miembros', label: 'Elegir varios miembros (convoca a todos)' },
+  { value: 'lider', label: 'Elegir un líder (solo líderes asignados)' },
+  { value: 'lideres', label: 'Elegir varios líderes (convoca solo a líderes)' },
 ];
 const ROLE_OPTIONS = [
   { value: 'member', label: 'Miembro' },
