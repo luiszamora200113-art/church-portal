@@ -3,6 +3,7 @@ const path = require('path');
 const PDFDocument = require('pdfkit');
 const pool = require('../config/db');
 const { requireAuth, requireRole } = require('../middleware/auth');
+const { parseFilters, fetchMovements } = require('../utils/financeQuery');
 
 const router = express.Router();
 const currentMonth = () => new Date().toISOString().slice(0, 7) + '-01';
@@ -490,6 +491,71 @@ router.get('/acuerdos/:id.pdf', requireAuth, requireRole('admin', 'superadmin', 
   doc.font('Helvetica').fontSize(9).fillColor(MOSS_DARK);
   doc.text('Secretaría', 70, y + 5, { width: 180, align: 'center', lineBreak: false });
   doc.text('Pastor / Presidencia', 330, y + 5, { width: 180, align: 'center', lineBreak: false });
+
+  finish();
+});
+
+// GET /api/reports/movimientos.pdf?from=&to=&type=&category_id=&q= -> informe de los movimientos tal como se ven en pantalla
+// (mismos filtros que la consulta de Tesorería: período, tipo, categoría y búsqueda).
+router.get('/movimientos.pdf', requireAuth, requireRole('admin', 'superadmin', 'finance'), async (req, res) => {
+  const f = parseFilters(req.query);
+  const { rows, totals } = await fetchMovements(f);
+
+  const monthName = (d) => {
+    const dt = new Date(`${d.slice(0, 7)}-01T00:00:00`);
+    return `${dt.toLocaleDateString('es-NI', { month: 'long' })} ${dt.getFullYear()}`;
+  };
+  const period = f.from === f.to ? monthName(f.from) : `${monthName(f.from)} — ${monthName(f.to)}`;
+  const view = f.type === 'ingreso' ? 'Solo ingresos' : f.type === 'egreso' ? 'Solo egresos' : 'Vista combinada';
+  let categoryName = null;
+  if (f.category_id) {
+    const { rows: c } = await pool.query('SELECT name FROM finance_categories WHERE id = $1', [f.category_id]);
+    categoryName = c[0]?.name || null;
+  }
+  const subtitle = [period, view, categoryName && `Categoría: ${categoryName}`, f.q && `Búsqueda: "${f.q}"`].filter(Boolean).join(' · ');
+  const { doc, finish } = createLetterheadPdf(res, 'movimientos.pdf', 'Reporte de Movimientos Financieros', subtitle);
+
+  doc.font('Helvetica-Bold').fontSize(12).fillColor(MOSS_DARK).text(`Detalle (${rows.length} movimiento${rows.length === 1 ? '' : 's'})`, 50, doc.y);
+  doc.moveDown(0.3);
+  const combined = !f.type;
+  const columns = combined
+    ? [
+        { key: 'month', label: 'Mes', width: 100 },
+        { key: 'category', label: 'Categoría', width: 115 },
+        { key: 'note', label: 'Descripción', width: 135 },
+        { key: 'type', label: 'Tipo', width: 62 },
+        { key: 'amount', label: 'Monto', width: 100, align: 'right' },
+      ]
+    : [
+        { key: 'month', label: 'Mes', width: 100 },
+        { key: 'category', label: 'Categoría', width: 130 },
+        { key: 'note', label: 'Descripción', width: 182 },
+        { key: 'amount', label: 'Monto', width: 100, align: 'right' },
+      ];
+  drawTable(
+    doc,
+    columns,
+    rows.length > 0
+      ? rows.map((r) => ({
+          month: monthName(r.entry_month), category: r.category_name, note: r.note || '—',
+          type: r.entry_type === 'egreso' ? 'Egreso' : 'Ingreso', amount: money(r.amount),
+        }))
+      : [{ month: '', category: 'Sin movimientos con estos filtros', note: '', type: '', amount: money(0) }]
+  );
+
+  if (doc.y > doc.page.height - 130) doc.addPage();
+  doc.moveDown(0.3);
+  const totalLine = (label, value, color, size = 11) =>
+    doc.font('Helvetica-Bold').fontSize(size).fillColor(MOSS_DARK)
+      .text(label, 50, doc.y, { continued: true, width: 330 })
+      .fillColor(color).text(money(value), { align: 'right' });
+  if (f.type === 'ingreso') totalLine('Total ingresos:', totals.ingresos, '#2f6b3a');
+  else if (f.type === 'egreso') totalLine('Total egresos:', totals.egresos, '#b23b3b');
+  else {
+    totalLine('Total ingresos:', totals.ingresos, '#2f6b3a');
+    totalLine('Total egresos:', totals.egresos, '#b23b3b');
+    totalLine('Balance:', totals.balance, MOSS_DARK, 13);
+  }
 
   finish();
 });
