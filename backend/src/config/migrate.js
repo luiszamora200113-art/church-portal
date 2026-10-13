@@ -261,6 +261,24 @@ const ALTER_STATEMENTS = [
   // Destino de publicación de la plantilla ('ninguno' | 'eventos' | 'programacion') y encargados asignados (ids de usuario).
   `ALTER TABLE custom_templates ADD COLUMN IF NOT EXISTS publish_to VARCHAR(20) NOT NULL DEFAULT 'ninguno';`,
   `ALTER TABLE custom_templates ADD COLUMN IF NOT EXISTS assigned_users JSONB;`,
+  // Secretaría: acuerdos de reuniones de líderes (cabecera + detalle de acuerdos).
+  `CREATE TABLE IF NOT EXISTS leader_meetings (
+    id SERIAL PRIMARY KEY,
+    meeting_date DATE NOT NULL,
+    meeting_type VARCHAR(80) NOT NULL,
+    attendees JSONB NOT NULL DEFAULT '[]',
+    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+  );`,
+  `CREATE TABLE IF NOT EXISTS meeting_agreements (
+    id SERIAL PRIMARY KEY,
+    meeting_id INTEGER NOT NULL REFERENCES leader_meetings(id) ON DELETE CASCADE,
+    row_order INTEGER NOT NULL DEFAULT 0,
+    description TEXT NOT NULL,
+    responsible VARCHAR(150),
+    due_date DATE,
+    status VARCHAR(20) NOT NULL DEFAULT 'pendiente' -- 'pendiente' | 'en_proceso' | 'cumplido'
+  );`,
 ];
 
 async function migrate() {
