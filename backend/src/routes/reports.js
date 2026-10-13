@@ -15,6 +15,30 @@ const GOLD = '#b98a3a';
 const MUTED = '#6b7268';
 const LINE = '#dedad0';
 
+// Miembros del reporte de membresía: mismo criterio para la vista previa en pantalla y para el PDF.
+// Filtros opcionales: célula (cell_id) y búsqueda por nombre q (sin distinguir mayúsculas ni acentos).
+const norm = (col) => `translate(lower(${col}), 'áéíóúüñ', 'aeiouun')`;
+async function fetchMembers({ cell_id, q }) {
+  const params = [];
+  let where = "u.role = 'member'";
+  if (cell_id) {
+    params.push(cell_id);
+    where += ` AND u.cell_id = $${params.length}`;
+  }
+  const term = String(q || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (term) {
+    params.push(`%${term.replace(/[%_\\]/g, (c) => '\\' + c)}%`);
+    where += ` AND ${norm('u.full_name')} LIKE $${params.length}`;
+  }
+  const { rows } = await pool.query(
+    `SELECT u.id, u.full_name, u.cell_id, c.name AS cell_name
+     FROM users u LEFT JOIN cells c ON c.id = u.cell_id
+     WHERE ${where} ORDER BY u.full_name`,
+    params
+  );
+  return rows;
+}
+
 const monthLabel = () =>
   new Date().toLocaleDateString('es-NI', { month: 'long', year: 'numeric' }).replace(/^./, (c) => c.toUpperCase());
 
@@ -106,7 +130,7 @@ function drawTable(doc, columns, rows, { startY } = {}) {
 
     if (y + rowHeight > doc.page.height - 80) {
       doc.addPage();
-      y = 50;
+      y = doc.y; // el membrete de la nueva página ya posicionó doc.y; evita que la tabla se monte sobre él
     }
     if (idx % 2 === 0) {
       doc.rect(left, y, width, rowHeight).fill('#f6f4ee');
@@ -246,21 +270,16 @@ router.get('/diezmos.pdf', requireAuth, requireRole('admin', 'superadmin', 'fina
 
 // GET /api/reports/miembros.pdf?cell_id=1 -> listado de miembros, agrupado por célula (o solo una si se filtra)
 router.get('/miembros.pdf', requireAuth, requireRole('admin', 'superadmin', 'secretary'), async (req, res) => {
-  const { cell_id } = req.query;
+  const { cell_id, q } = req.query;
   const { rows: cellList } = await pool.query(
     cell_id ? 'SELECT id, name FROM cells WHERE id = $1 ORDER BY id' : 'SELECT id, name FROM cells ORDER BY id',
     cell_id ? [cell_id] : []
   );
-  const { rows: members } = await pool.query(`
-    SELECT u.full_name, u.cell_id
-    FROM users u
-    WHERE u.role = 'member' ${cell_id ? 'AND u.cell_id = $1' : ''}
-    ORDER BY u.full_name
-  `, cell_id ? [cell_id] : []);
+  const members = await fetchMembers({ cell_id, q });
 
   const totalCount = members.length;
   const reportTitle = cell_id && cellList[0] ? `Miembros — ${cellList[0].name}` : 'Miembros por Célula';
-  const { doc, finish } = createLetterheadPdf(res, 'reporte-miembros.pdf', reportTitle, `${totalCount} miembros registrados`);
+  const { doc, finish } = createLetterheadPdf(res, 'reporte-miembros.pdf', reportTitle, `${totalCount} miembros registrados${q && String(q).trim() ? ` · búsqueda: "${String(q).trim()}"` : ''}`);
 
   const groups = [
     ...cellList.map((c) => ({ label: c.name, members: members.filter((m) => m.cell_id === c.id) })),
@@ -403,6 +422,74 @@ router.get('/programacion/:id.pdf', requireAuth, async (req, res) => {
   if (dataRows.length > 0 && columns.length > 0) {
     drawTable(doc, columns, dataRows.map((r) => r.data));
   }
+
+  finish();
+});
+
+// GET /api/reports/miembros?cell_id=1&q=juan -> la misma lista del PDF, en JSON, para la vista previa en pantalla
+router.get('/miembros', requireAuth, requireRole('admin', 'superadmin', 'secretary'), async (req, res) => {
+  const { cell_id, q } = req.query;
+  res.json(await fetchMembers({ cell_id, q }));
+});
+
+// GET /api/reports/acuerdos/:id.pdf -> informe oficial de una reunión: encabezado, asistentes, acuerdos y firmas
+const AGREEMENT_STATUS = { pendiente: 'Pendiente', en_proceso: 'En proceso', cumplido: 'Cumplido' };
+router.get('/acuerdos/:id.pdf', requireAuth, requireRole('admin', 'superadmin', 'secretary'), async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT m.id, m.meeting_type, m.attendees, to_char(m.meeting_date, 'YYYY-MM-DD') AS d
+     FROM leader_meetings m WHERE m.id = $1`,
+    [req.params.id]
+  );
+  if (rows.length === 0) return res.status(404).json({ error: 'Reunión no encontrada.' });
+  const meeting = rows[0];
+  const { rows: agreements } = await pool.query(
+    `SELECT description, responsible, to_char(due_date, 'DD/MM/YYYY') AS due, status
+     FROM meeting_agreements WHERE meeting_id = $1 ORDER BY row_order, id`,
+    [meeting.id]
+  );
+
+  const dateLabel = new Date(`${meeting.d}T00:00:00`).toLocaleDateString('es-NI', { day: '2-digit', month: 'long', year: 'numeric' });
+  const attendees = Array.isArray(meeting.attendees) ? meeting.attendees : [];
+  const { doc, finish } = createLetterheadPdf(res, `acuerdos-${meeting.d}.pdf`, 'Acuerdos de Reunión', `${meeting.meeting_type} · ${dateLabel}`);
+
+  const line = (label, value) => {
+    doc.font('Helvetica-Bold').fontSize(10).fillColor(MOSS_DARK).text(`${label}: `, 50, doc.y, { continued: true });
+    doc.font('Helvetica').fillColor(MUTED).text(value);
+  };
+  line('Fecha', dateLabel);
+  line('Tipo de reunión', meeting.meeting_type);
+  line(`Asistentes (${attendees.length})`, attendees.length ? attendees.join(', ') : 'Sin registrar');
+  doc.moveDown(0.6);
+
+  doc.font('Helvetica-Bold').fontSize(12).fillColor(MOSS_DARK).text('Acuerdos', 50, doc.y);
+  doc.moveDown(0.3);
+  if (agreements.length > 0) {
+    drawTable(
+      doc,
+      [
+        { key: 'n', label: '#', width: 30 },
+        { key: 'description', label: 'Acuerdo', width: 212 },
+        { key: 'responsible', label: 'Responsable', width: 110 },
+        { key: 'due', label: 'Fecha límite', width: 80 },
+        { key: 'status', label: 'Estado', width: 80 },
+      ],
+      agreements.map((a, i) => ({
+        n: i + 1, description: a.description, responsible: a.responsible || '—', due: a.due || '—', status: AGREEMENT_STATUS[a.status] || a.status,
+      }))
+    );
+  } else {
+    doc.font('Helvetica').fontSize(10).fillColor(MUTED).text('Esta reunión no tiene acuerdos registrados.', 50, doc.y);
+  }
+
+  // Firmas
+  if (doc.y > doc.page.height - 190) doc.addPage();
+  const y = doc.y + 70;
+  doc.strokeColor(MOSS_DARK).lineWidth(0.8);
+  doc.moveTo(70, y).lineTo(250, y).stroke();
+  doc.moveTo(330, y).lineTo(510, y).stroke();
+  doc.font('Helvetica').fontSize(9).fillColor(MOSS_DARK);
+  doc.text('Secretaría', 70, y + 5, { width: 180, align: 'center', lineBreak: false });
+  doc.text('Pastor / Presidencia', 330, y + 5, { width: 180, align: 'center', lineBreak: false });
 
   finish();
 });
