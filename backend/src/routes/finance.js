@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../config/db');
 const { requireAuth, requireRole } = require('../middleware/auth');
+const { parseFilters, fetchMovements } = require('../utils/financeQuery');
 
 const router = express.Router();
 
@@ -113,6 +114,15 @@ router.get('/report', requireAuth, requireFinanceAccess, async (req, res) => {
     byCategory: byCategory.map((r) => ({ ...r, ingresos: Number(r.ingresos), egresos: Number(r.egresos) })),
     byMonth: byMonth.map((r) => ({ ...r, ingresos: Number(r.ingresos), egresos: Number(r.egresos) })),
   });
+});
+
+// GET /api/finance/movements?from=YYYY-MM&to=YYYY-MM&type=ingreso|egreso&category_id=1&q=texto
+// Movimientos filtrados + totales (ingresos, egresos, balance), para la consulta en pantalla de Tesorería.
+// Los rangos son por mes porque cada movimiento se registra con su mes.
+router.get('/movements', requireAuth, requireRole('admin', 'superadmin', 'finance'), async (req, res) => {
+  const filters = parseFilters(req.query);
+  const { rows, totals } = await fetchMovements(filters);
+  res.json({ filters, totals, rows });
 });
 
 // GET /api/finance/categories -> lista de categorías (para el formulario de admin)
