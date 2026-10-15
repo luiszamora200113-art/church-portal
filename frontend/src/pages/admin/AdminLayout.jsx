@@ -42,7 +42,9 @@ export default function AdminLayout() {
           <Link className={linkClass('/admin/servicios')} to="/admin/servicios">Servicios</Link>
           <Link className={linkClass('/admin/ministerios')} to="/admin/ministerios">Ministerios</Link>
           <Link className={linkClass('/admin/historial')} to="/admin/historial">Historial</Link>
-          <Link className={linkClass('/admin/plantillas')} to="/admin/plantillas">Plantillas</Link>
+          {user.role === 'superadmin' && (
+            <Link className={linkClass('/admin/plantillas')} to="/admin/plantillas">Plantillas</Link>
+          )}
           {user.role === 'superadmin' && (
             <Link className={linkClass('/admin/conocenos')} to="/admin/conocenos">Conócenos</Link>
           )}
@@ -58,6 +60,7 @@ export default function AdminLayout() {
               </span>
             )}
           </Link>
+          <Link className={linkClass('/admin/biblioteca')} to="/admin/biblioteca">Biblioteca</Link>
           <Link className={linkClass('/admin/deberes')} to="/admin/deberes">Deberes</Link>
           <Link className={linkClass('/admin/reportes')} to="/admin/reportes">Reportes</Link>
           <Link className="admin-back-mobile" to="/dashboard">← Volver al portal</Link>
