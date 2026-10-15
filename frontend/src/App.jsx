@@ -26,6 +26,9 @@ import EducationPanel from './pages/EducationPanel.jsx';
 import Documents from './pages/Documents.jsx';
 import Events from './pages/Events.jsx';
 import MonthlySchedule from './pages/MonthlySchedule.jsx';
+import Biblioteca from './pages/Biblioteca.jsx';
+import BibliotecaEducacion from './pages/BibliotecaEducacion.jsx';
+import AdminBiblioteca from './pages/admin/AdminBiblioteca.jsx';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -50,18 +53,9 @@ function RequireAuthOnly({ children }) {
 }
 
 function Nav() {
-  const { user, logout, token, API_URL } = useAuth();
+  const { user, logout } = useAuth();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = React.useState(false);
-  // ¿Tiene alguna plantilla asignada para llenar? Si sí, ve el enlace a Documentos aunque no sea secretaría/admin.
-  const [hasTemplates, setHasTemplates] = React.useState(false);
-  React.useEffect(() => {
-    if (!user || !token) return;
-    fetch(`${API_URL}/api/custom-templates/mine`, { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => r.json())
-      .then((list) => setHasTemplates(Array.isArray(list) && list.length > 0))
-      .catch(() => {});
-  }, [user, token]);
 
   React.useEffect(() => { setMenuOpen(false); }, [location.pathname]);
 
@@ -97,7 +91,8 @@ function Nav() {
         )}
         <Link className={linkClass('/eventos')} to="/eventos">Eventos</Link>
         <Link className={linkClass('/programacion')} to="/programacion">Programación</Link>
-        {(['admin', 'superadmin', 'secretary'].includes(user.role) || hasTemplates) && (
+        <Link className={linkClass('/biblioteca')} to="/biblioteca">Biblioteca</Link>
+        {['admin', 'superadmin', 'secretary'].includes(user.role) && (
           <Link className={linkClass('/documentos')} to="/documentos">Documentos</Link>
         )}
         {['admin', 'superadmin'].includes(user.role) && (
@@ -190,6 +185,22 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/biblioteca"
+          element={
+            <ProtectedRoute>
+              <Biblioteca />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/educacion/biblioteca"
+          element={
+            <ProtectedRoute>
+              <BibliotecaEducacion />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/tesoreria" element={<TreasuryPanel />} />
         <Route path="/secretaria" element={<SecretaryPanel />} />
         <Route path="/educacion" element={<EducationPanel />} />
@@ -208,6 +219,7 @@ export default function App() {
           <Route path="deberes" element={<AdminDuties />} />
           <Route path="documentos" element={<AdminDocuments />} />
           <Route path="reportes" element={<AdminReports />} />
+          <Route path="biblioteca" element={<AdminBiblioteca />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
