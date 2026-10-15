@@ -1,0 +1,87 @@
+/* Biblioteca digital — estilos nuevos con prefijo bib-, no modifican nada existente.
+   Reutiliza las variables de styles.css (--moss, --gold, --line, etc.). */
+
+.bib-filters { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; margin-bottom: 20px; }
+@media (max-width: 720px) { .bib-filters { grid-template-columns: 1fr; } }
+
+.bib-textarea {
+  width: 100%;
+  padding: 11px 13px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  background: #fbfaf6;
+  resize: vertical;
+}
+.bib-textarea:focus { outline: 2px solid var(--gold); border-color: transparent; }
+
+/* tarjetas de la biblioteca */
+.bib-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+@media (max-width: 720px) { .bib-grid { grid-template-columns: 1fr; } }
+.bib-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+}
+.bib-card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.bib-card h3 { font-size: 16px; color: var(--moss-dark); margin: 10px 0 4px; }
+.bib-desc { font-size: 13px; color: var(--ink); margin: 0 0 8px; }
+.bib-meta { font-size: 12px; margin: 0 0 14px; }
+.bib-card-actions { display: flex; gap: 8px; margin-top: auto; flex-wrap: wrap; }
+.bib-card-actions .primary { margin-top: 0; width: auto; padding: 9px 16px; font-size: 13px; }
+.bib-chip {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  background: var(--gold-soft); color: #6b4d17; padding: 3px 10px; border-radius: 999px;
+}
+.bib-ext { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--muted); }
+
+/* filas (gestor y admin) */
+.bib-row { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.bib-row:last-child { border-bottom: none; }
+.bib-row-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.bib-row-actions .btn-outline { font-size: 12px; padding: 6px 12px; }
+.bib-edit { padding: 4px 0 8px; }
+
+.bib-status { display: inline-block; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; margin-top: 6px; }
+.bib-status-pending { background: #fdf3dc; color: #7a5a14; }
+.bib-status-approved { background: #eaf3ea; color: #2c5230; }
+.bib-status-rejected { background: #fbe9e7; color: #a4342a; }
+.bib-observation { font-size: 13px; background: #fdf4f4; border: 1px solid #e0b8b8; border-radius: 9px; padding: 8px 12px; margin: 8px 0 0; }
+
+/* pestañas del panel admin */
+.bib-tabs { display: flex; gap: 6px; margin-bottom: 18px; flex-wrap: wrap; }
+.bib-tabs button {
+  background: transparent; border: 1px solid var(--line); border-radius: 999px;
+  padding: 8px 16px; font-size: 13px; color: var(--moss-dark); cursor: pointer;
+}
+.bib-tabs button.active { background: var(--moss); border-color: var(--moss); color: #f6f4ee; font-weight: 600; }
+
+/* visor modal */
+.bib-overlay {
+  position: fixed; inset: 0; background: rgba(20, 30, 25, .65); z-index: 1000;
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.bib-modal {
+  background: var(--card); border-radius: var(--radius); width: 100%; max-width: 980px;
+  height: 90vh; display: flex; flex-direction: column; overflow: hidden;
+}
+.bib-modal-head {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  padding: 14px 18px; border-bottom: 1px solid var(--line); flex-wrap: wrap;
+}
+.bib-modal-title { display: block; font-size: 15px; color: var(--moss-dark); overflow: hidden; text-overflow: ellipsis; }
+.bib-modal-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.bib-modal-actions .btn-outline { font-size: 12px; padding: 7px 12px; }
+.bib-modal-body { flex: 1; min-height: 0; overflow: auto; background: #f1efe8; }
+.bib-frame { width: 100%; height: 100%; border: 0; background: #fff; }
+.bib-image { display: block; max-width: 100%; margin: 0 auto; }
+.bib-text { margin: 0; padding: 20px; white-space: pre-wrap; word-break: break-word; font-size: 14px; background: #fff; min-height: 100%; }
+.bib-nopreview { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 8px; height: 100%; padding: 30px; }
+@media (max-width: 720px) {
+  .bib-overlay { padding: 0; }
+  .bib-modal { height: 100vh; max-width: 100%; border-radius: 0; }
+}
