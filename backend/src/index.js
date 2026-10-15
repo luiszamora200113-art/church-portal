@@ -16,11 +16,13 @@ const customTemplateRoutes = require('./routes/custom-templates');
 const churchInfoRoutes = require('./routes/church-info');
 const servicesRoutes = require('./routes/services');
 const ministriesRoutes = require('./routes/ministries');
-const meetingRoutes = require('./routes/meetings');
+const bibliotecaRoutes = require('./routes/biblioteca');
 
 const app = express();
 
 app.use(cors());
+// Biblioteca: va ANTES del parser global porque recibe archivos (límite propio de 25mb).
+app.use('/api/biblioteca', express.json({ limit: '25mb' }), bibliotecaRoutes);
 app.use(express.json({ limit: '8mb' }));
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
@@ -38,7 +40,6 @@ app.use('/api/custom-templates', customTemplateRoutes);
 app.use('/api/church-info', churchInfoRoutes);
 app.use('/api/services', servicesRoutes);
 app.use('/api/ministries', ministriesRoutes);
-app.use('/api/meetings', meetingRoutes);
 
 // Sirve el frontend ya compilado (frontend/dist) desde este mismo servidor,
 // para que todo el portal viva en un solo servicio con un solo link.
