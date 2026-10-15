@@ -60,6 +60,7 @@ export default function EducationPanel() {
         </div>
         <nav className="admin-nav">
           <span className="active">Temas</span>
+          <Link to="/educacion/biblioteca">Biblioteca</Link>
         </nav>
         <Link className="admin-back" to="/dashboard">← Volver al portal</Link>
       </aside>
