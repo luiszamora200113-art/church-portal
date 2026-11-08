@@ -57,7 +57,20 @@ function Nav() {
   const location = useLocation();
   const [menuOpen, setMenuOpen] = React.useState(false);
 
-  React.useEffect(() => { setMenuOpen(false); }, [location.pathname]);
+  const [groupOpen, setGroupOpen] = React.useState(false);
+  const groupRef = React.useRef(null);
+
+  React.useEffect(() => { setMenuOpen(false); setGroupOpen(false); }, [location.pathname]);
+
+  // Cierra el desplegable "Gestión" al tocar fuera de él.
+  React.useEffect(() => {
+    if (!groupOpen) return undefined;
+    const onDown = (e) => {
+      if (groupRef.current && !groupRef.current.contains(e.target)) setGroupOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [groupOpen]);
 
   if (!user) return null;
   // El nav del miembro no se muestra dentro de los paneles con su propio layout (admin, tesorería, secretaría).
@@ -67,6 +80,15 @@ function Nav() {
   if (location.pathname.startsWith('/educacion')) return null;
 
   const linkClass = (path) => (location.pathname === path ? 'active' : '');
+
+  // Enlaces de trabajo según el rol: se agrupan en el desplegable "Gestión" para no saturar la barra.
+  const staffItems = [];
+  if (['admin', 'superadmin', 'secretary'].includes(user.role)) staffItems.push({ to: '/documentos', label: 'Documentos' });
+  if (['admin', 'superadmin'].includes(user.role)) staffItems.push({ to: '/admin/miembros', label: 'Panel de administración', match: '/admin' });
+  if (['finance', 'admin', 'superadmin'].includes(user.role)) staffItems.push({ to: '/tesoreria', label: 'Tesorería' });
+  if (['secretary', 'admin', 'superadmin'].includes(user.role)) staffItems.push({ to: '/secretaria', label: 'Secretaría' });
+  if (['education', 'admin', 'superadmin'].includes(user.role)) staffItems.push({ to: '/educacion', label: 'Educación Cristiana' });
+  const isStaffActive = (item) => location.pathname.startsWith(item.match || item.to);
 
   return (
     <div className="topnav">
@@ -92,15 +114,26 @@ function Nav() {
         <Link className={linkClass('/eventos')} to="/eventos">Eventos</Link>
         <Link className={linkClass('/programacion')} to="/programacion">Programación</Link>
         <Link className={linkClass('/biblioteca')} to="/biblioteca">Biblioteca</Link>
-        {['admin', 'superadmin', 'secretary'].includes(user.role) && (
-          <Link className={linkClass('/documentos')} to="/documentos">Documentos</Link>
+        {staffItems.length === 1 && (
+          <Link className={isStaffActive(staffItems[0]) ? 'active' : ''} to={staffItems[0].to}>{staffItems[0].label}</Link>
         )}
-        {['admin', 'superadmin'].includes(user.role) && (
-          <Link to="/admin/miembros">Panel de administración</Link>
+        {staffItems.length > 1 && (
+          <div className="nav-group" ref={groupRef}>
+            <button
+              type="button"
+              className={`nav-group-toggle ${staffItems.some(isStaffActive) ? 'active' : ''} ${groupOpen ? 'open' : ''}`}
+              aria-expanded={groupOpen}
+              onClick={() => setGroupOpen((o) => !o)}
+            >
+              Gestión <span className="nav-caret">▾</span>
+            </button>
+            <div className={`nav-group-menu ${groupOpen ? 'open' : ''}`}>
+              {staffItems.map((item) => (
+                <Link key={item.to} className={isStaffActive(item) ? 'active' : ''} to={item.to}>{item.label}</Link>
+              ))}
+            </div>
+          </div>
         )}
-        {['finance', 'admin', 'superadmin'].includes(user.role) && <Link className={linkClass('/tesoreria')} to="/tesoreria">Tesorería</Link>}
-        {['secretary', 'admin', 'superadmin'].includes(user.role) && <Link className={linkClass('/secretaria')} to="/secretaria">Secretaría</Link>}
-        {['education', 'admin', 'superadmin'].includes(user.role) && <Link className={linkClass('/educacion')} to="/educacion">Educación Cristiana</Link>}
         <a href="#" className="nav-logout" onClick={(e) => { e.preventDefault(); logout(); }}>Cerrar sesión</a>
       </nav>
     </div>
