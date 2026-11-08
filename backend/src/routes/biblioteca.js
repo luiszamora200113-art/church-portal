@@ -340,11 +340,11 @@ router.patch('/resources/:id/review', requireAuth, requireRole(...REVIEW), wrap(
   const { rows } = await pool.query(
     `UPDATE biblioteca_resources
      SET status = $1, review_comment = $2, reviewed_by = $3, reviewed_at = NOW(),
-         published_at = CASE WHEN $1 = 'approved' THEN NOW() ELSE NULL END,
+         published_at = CASE WHEN $5::boolean THEN NOW() ELSE NULL END,
          updated_at = NOW()
      WHERE id = $4 AND status = 'pending'
      RETURNING id, title, uploaded_by`,
-    [approve ? 'approved' : 'rejected', note || null, req.user.id, req.params.id]
+    [approve ? 'approved' : 'rejected', note || null, req.user.id, req.params.id, !!approve]
   );
   if (rows.length === 0) return res.status(404).json({ error: 'El recurso no existe o ya fue revisado.' });
 
