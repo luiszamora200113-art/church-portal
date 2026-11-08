@@ -52,6 +52,51 @@ function RequireAuthOnly({ children }) {
   return children;
 }
 
+const NAV_CSS = `
+/* Navegación superior: grupo "Gestión" (desplegable). Va aquí dentro para que App.jsx sea autosuficiente. */
+.topnav .brand { white-space: nowrap; flex-shrink: 0; }
+.topnav nav a { white-space: nowrap; }
+.nav-group { position: relative; }
+.nav-group-toggle {
+  background: none; border: none; padding: 0; margin: 0; cursor: pointer;
+  color: #cfd8cf; font-size: 13px; font-family: inherit; line-height: inherit; white-space: nowrap;
+  display: flex; align-items: center; gap: 5px;
+}
+.nav-group-toggle:hover { color: #fff; }
+.nav-group-toggle.active { color: #fff; font-weight: 600; border-bottom: 2px solid var(--gold); padding-bottom: 4px; }
+.nav-caret { font-size: 10px; transition: transform .15s ease; }
+.nav-group-toggle.open .nav-caret { transform: rotate(180deg); }
+.nav-group-menu {
+  display: none; position: absolute; right: 0; top: calc(100% + 14px); min-width: 240px;
+  flex-direction: column; background: var(--moss-dark);
+  border: 1px solid rgba(255,255,255,.12); border-radius: 12px; padding: 6px;
+  box-shadow: 0 12px 28px rgba(0,0,0,.3); z-index: 50;
+}
+.nav-group-menu.open { display: flex; }
+.topnav nav .nav-group-menu a { display: block; padding: 10px 14px; border-radius: 8px; border-bottom: none; }
+.topnav nav .nav-group-menu a:hover { background: rgba(255,255,255,.08); }
+.topnav nav .nav-group-menu a.active { background: rgba(255,255,255,.12); border-bottom: none; padding-bottom: 10px; }
+
+@media (min-width: 721px) and (max-width: 1050px) {
+  .topnav { padding-left: 16px; padding-right: 16px; }
+  .topnav nav { gap: 14px; font-size: 12.5px; }
+  .nav-group-toggle { font-size: 12.5px; }
+}
+
+@media (max-width: 720px) {
+  .nav-group { width: 100%; }
+  .nav-group-toggle, .nav-group-toggle.active {
+    width: 100%; padding: 16px 24px 6px; border-bottom: none;
+    color: var(--gold-soft); font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .06em; pointer-events: none;
+  }
+  .nav-caret { display: none; }
+  .nav-group-menu { display: flex; position: static; min-width: 0; background: transparent; border: none; border-radius: 0; box-shadow: none; padding: 0; }
+  .topnav nav .nav-group-menu a { padding: 14px 24px 14px 36px; border-radius: 0; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .topnav nav .nav-group-menu a.active { padding-bottom: 14px; }
+}
+`;
+
 function Nav() {
   const { user, logout } = useAuth();
   const location = useLocation();
@@ -92,6 +137,7 @@ function Nav() {
 
   return (
     <div className="topnav">
+      <style>{NAV_CSS}</style>
       <div className="brand">
         <img className="brand-logo" src="/assets/logo-claro.png" alt="Logo Iglesia Hechos 1:8" />
         Hechos 1:8
