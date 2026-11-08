@@ -445,117 +445,39 @@ button.secondary, .btn-outline {
   margin-bottom: 14px;
 }
 
+/* ---- navegación: grupo "Gestión" (desplegable) y ajustes para que no se amontone ---- */
+.topnav .brand { white-space: nowrap; flex-shrink: 0; }
+.topnav nav a { white-space: nowrap; }
+.nav-group { position: relative; }
+.nav-group-toggle {
+  background: none; border: none; padding: 0; cursor: pointer;
+  color: #cfd8cf; font-size: 13px; font-family: inherit; white-space: nowrap;
+  display: flex; align-items: center; gap: 5px;
+}
+.nav-group-toggle.active { color: #fff; font-weight: 600; border-bottom: 2px solid var(--gold); padding-bottom: 4px; }
+.nav-caret { font-size: 10px; transition: transform .15s ease; }
+.nav-group-toggle.open .nav-caret { transform: rotate(180deg); }
+.nav-group-menu {
+  display: none; position: absolute; right: 0; top: calc(100% + 14px); min-width: 240px;
+  flex-direction: column; background: var(--moss-dark);
+  border: 1px solid rgba(255,255,255,.12); border-radius: 12px; padding: 6px;
+  box-shadow: 0 12px 28px rgba(0,0,0,.3); z-index: 50;
+}
+.nav-group-menu.open { display: flex; }
+.topnav nav .nav-group-menu a { padding: 10px 14px; border-radius: 8px; border-bottom: none; }
+.topnav nav .nav-group-menu a:hover { background: rgba(255,255,255,.08); }
+.topnav nav .nav-group-menu a.active { background: rgba(255,255,255,.12); border-bottom: none; padding-bottom: 10px; }
 
-/* ---- tablas de programación (.sched-table) ---- */
-.sched-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 560px; }
-.sched-table th {
-  text-align: left;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: .05em;
-  color: var(--moss-dark);
-  background: var(--paper);
-  padding: 10px 14px;
-  border-bottom: 2px solid var(--gold-soft);
-  white-space: nowrap;
-}
-.sched-table td { padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
-.sched-table tbody tr:last-child td { border-bottom: none; }
-.sched-table tr.special td { background: #fdf9f0; font-weight: 600; color: var(--moss-dark); }
-.sched-table .tag {
-  display: inline-block;
-  margin-left: 8px;
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .04em;
-  background: var(--gold-soft);
-  color: #6b4d17;
-  padding: 2px 8px;
-  border-radius: 999px;
-}
-.sched-table input, .sched-table select { min-width: 110px; }
-.sched-status {
-  font-size: 12px;
-  font-weight: 700;
-  background: #eaf3ea;
-  color: #2c5230;
-  border: 1px solid #bcd8bc;
-  padding: 5px 12px;
-  border-radius: 999px;
-}
-/* En celular la tabla no se sale de la pantalla: su contenedor hace scroll horizontal. */
-.card:has(.sched-table), .doc-card-body { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 @media (max-width: 720px) {
-  .sched-table th, .sched-table td { padding: 9px 10px; font-size: 13px; }
+  /* En celular el menú ya es una lista vertical: "Gestión" se muestra como un título con sus enlaces debajo. */
+  .nav-group { width: 100%; }
+  .nav-group-toggle, .nav-group-toggle.active {
+    width: 100%; padding: 16px 24px 6px; border-bottom: none;
+    color: var(--gold-soft); font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .06em; pointer-events: none;
+  }
+  .nav-caret { display: none; }
+  .nav-group-menu { display: flex; position: static; min-width: 0; background: transparent; border: none; border-radius: 0; box-shadow: none; padding: 0; }
+  .topnav nav .nav-group-menu a { padding: 14px 24px 14px 36px; border-radius: 0; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .topnav nav .nav-group-menu a.active { padding-bottom: 14px; }
 }
-
-
-/* ---- casillas y botones de opción: no deben estirarse al 100 % como los campos de texto ---- */
-input[type="checkbox"], input[type="radio"] { width: auto; padding: 0; margin: 0; flex-shrink: 0; accent-color: var(--moss); }
-
-/* ---- selector de miembros / líderes (convocatorias) ---- */
-.member-picker { border: 1px solid var(--line); border-radius: 12px; background: #fbfaf6; overflow: hidden; }
-.member-picker-bar {
-  display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;
-  padding: 10px 14px; background: var(--paper); border-bottom: 1px solid var(--line);
-  font-size: 12px; color: var(--muted); font-weight: 600;
-}
-.member-picker-bar .actions { display: flex; gap: 6px; }
-.member-picker-bar button { padding: 4px 10px; font-size: 12px; }
-.member-picker-list { max-height: 260px; overflow-y: auto; }
-.member-option {
-  display: flex; align-items: center; justify-content: flex-start; gap: 12px;
-  margin: 0; padding: 10px 14px; border-bottom: 1px solid var(--line);
-  font-size: 14px; font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--ink);
-  cursor: pointer; text-align: left;
-}
-.member-option:last-child { border-bottom: none; }
-.member-option:hover { background: #f1efe6; }
-.member-option.checked { background: #eef3ee; }
-.member-option .who { display: flex; flex-direction: column; min-width: 0; }
-.member-option .who strong { font-weight: 600; }
-.member-option .who small { font-size: 12px; color: var(--muted); }
-.member-picker-empty { padding: 14px; font-size: 13px; color: var(--muted); margin: 0; }
-
-
-/* ---- Secretaría: tablas con texto largo, estados, modal ---- */
-.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.admin-content .sched-table.wrap-table { display: table; white-space: normal; min-width: 640px; }
-.cell-textarea {
-  width: 100%; padding: 9px 11px; border-radius: 9px; border: 1px solid var(--line);
-  font-family: 'Inter', sans-serif; font-size: 14px; background: #fbfaf6; resize: vertical;
-}
-.cell-textarea:focus { outline: 2px solid var(--gold); border-color: transparent; }
-.status-select { font-size: 13px; padding: 7px 10px; font-weight: 600; }
-.status-select.pendiente { background: #fdf4e3; color: #8a5a10; }
-.status-select.en_proceso { background: #e8f0f8; color: #234a73; }
-.status-select.cumplido { background: #eaf3ea; color: #2c5230; }
-.badge-status.vencido {
-  display: inline-block; margin-left: 8px; font-size: 10px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .04em; background: #fbe9e7; color: #a4342a; padding: 2px 8px; border-radius: 999px;
-}
-.modal-overlay {
-  position: fixed; inset: 0; z-index: 100; background: rgba(20, 30, 25, .55);
-  display: flex; align-items: center; justify-content: center; padding: 20px;
-}
-.modal-box { background: var(--card); border-radius: 14px; padding: 24px; width: 100%; max-width: 420px; box-shadow: 0 20px 50px rgba(0,0,0,.3); }
-.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
-.btn-danger { background: #b23b3b; color: #fff; border: none; border-radius: 9px; padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer; }
-.btn-danger:hover { background: #962f2f; }
-
-
-/* ---- Tesorería: consulta de movimientos ---- */
-.seg { display: inline-flex; flex-wrap: wrap; gap: 4px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 4px; margin-bottom: 16px; }
-.seg button { border: none; background: transparent; padding: 9px 16px; border-radius: 9px; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; }
-.seg button.active { background: var(--moss); color: #f6f4ee; }
-.seg button:not(.active):hover { background: rgba(47,77,58,.08); }
-.filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; align-items: end; }
-.export-bar { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin: 16px 0 10px; }
-.export-bar .actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.export-bar .btn-outline:disabled { opacity: .5; cursor: default; }
-.swatch-dot { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 8px; vertical-align: middle; }
-.badge-tipo { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 999px; }
-.badge-tipo.ingreso { background: #eaf3ea; color: #2c5230; }
-.badge-tipo.egreso { background: #fbe9e7; color: #a4342a; }
-.sched-table tfoot td { border-top: 2px solid var(--gold-soft); background: var(--paper); padding: 12px 14px; }
